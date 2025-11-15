@@ -1,95 +1,149 @@
 // resources/js/components/PilihPaket.jsx
-import React, { useState } from 'react';
-import Layout from './Layout';
+import React, { useState } from "react";
 
 const PilihPaket = ({ onNext, onBack }) => {
     const [selectedPackage, setSelectedPackage] = useState(null);
 
     const packages = [
         {
-            id: 'vintage',
-            name: 'Paket Vintage',
-            description: 'Paket photobooth Vintage, unlimited retake, dengan 12 hasil print foto dan waktu 12 menit.',
-            price: 12000
+            id: "vintage",
+            name: "Paket Vintage",
+            description:
+                "Paket photobooth Vintage, unlimited retake, dengan 12 hasil print foto dan waktu 12 menit.",
+            price: 12000,
         },
         {
-            id: 'retro',
-            name: 'Paket Retro',
-            description: 'Paket photobooth Retro, unlimited retake, dengan 12 hasil print foto dan waktu 15 menit.',
-            price: 19000
-        }
+            id: "retro",
+            name: "Paket Retro",
+            description:
+                "Paket photobooth Retro, unlimited retake, dengan 12 hasil print foto dan waktu 15 menit.",
+            price: 19000,
+        },
     ];
 
-    const handleSelectPackage = (packageId) => {
-        setSelectedPackage(packageId);
-    };
-
     const handleContinue = () => {
-        if (selectedPackage) {
-            // Lanjutkan ke halaman Add On, kirim data paket yang dipilih
-            onNext(selectedPackage);
-        } else {
-            alert('Silakan pilih paket terlebih dahulu.');
-        }
+        if (selectedPackage) return onNext(selectedPackage);
+        alert("Silakan pilih paket terlebih dahulu.");
     };
 
     return (
-        <Layout showBackButton={true} onBack={onBack}>
-            <h1 style={{ fontSize: '2.5em', marginBottom: '40px', color: '#333' }}>Pilih Paket Photobooth</h1>
-            <div style={{
-                display: 'flex',
-                gap: '30px',
-                justifyContent: 'center',
-                flexWrap: 'wrap'
-            }}>
-                {packages.map(pkg => (
-                    <div
-                        key={pkg.id}
-                        onClick={() => handleSelectPackage(pkg.id)}
-                        style={{
-                            backgroundColor: selectedPackage === pkg.id ? '#e6f7ff' : '#f8f9fa', // Latar belakang berubah saat dipilih
-                            border: `2px solid ${selectedPackage === pkg.id ? '#007bff' : '#ccc'}`,
-                            borderRadius: '15px',
-                            padding: '30px',
-                            width: '300px',
-                            textAlign: 'left',
-                            cursor: 'pointer',
-                            boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
-                            transition: 'all 0.3s ease',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'space-between'
-                        }}
-                    >
-                        <div>
-                            <h2 style={{ fontSize: '1.8em', marginBottom: '10px', color: '#007bff' }}>{pkg.name}</h2>
-                            <p style={{ fontSize: '1.1em', color: '#666', lineHeight: '1.5' }}>{pkg.description}</p>
+        <div
+            className="
+                min-h-screen 
+                bg-[url('/images/bg.jpg')] bg-cover bg-center bg-no-repeat
+                flex flex-col items-center justify-center 
+                px-5 py-10 
+                relative
+            "
+        >
+            {/* Tombol Kembali */}
+            <button
+                onClick={onBack}
+                className="
+                    absolute top-5 left-5 
+                    px-5 py-2 
+                    rounded-full 
+                    bg-red-500 text-white 
+                    shadow-md
+                    transition-all duration-200
+                    hover:bg-red-700
+                "
+            >
+                Kembali
+            </button>
+
+            {/* Title */}
+            <h1
+                className="
+                    font-bestian 
+                    text-white font-bold text-3xl md:text-4xl
+                    mb-12 
+                    drop-shadow-[2px_2px_4px_rgba(0,0,0,0.3)]
+                    text-center
+                "
+            >
+                Pilih Paket Photobooth
+            </h1>
+
+            {/* Grid Paket */}
+            <div
+                className="
+                    grid 
+                    grid-cols-1 md:grid-cols-2
+                    gap-8 
+                    max-w-4xl w-full
+                    mb-12
+                "
+            >
+                {packages.map((pkg) => {
+                    const active = selectedPackage === pkg.id;
+                    return (
+                        <div
+                            key={pkg.id}
+                            onClick={() => setSelectedPackage(pkg.id)}
+                            className={`
+                                cursor-pointer 
+                                p-7 rounded-xl shadow-lg 
+                                flex flex-col justify-between
+                                min-h-[260px]
+                                transition-all duration-300
+
+                                ${
+                                    active
+                                        ? "bg-blue-50/95 border-4 border-blue-600 scale-105 shadow-blue-300"
+                                        : "bg-blue-50/80 border-4 border-sky-300 hover:scale-105 hover:shadow-xl"
+                                }
+                            `}
+                        >
+                            <div>
+                                <h2 className="text-2xl font-bold text-blue-700 mb-3">
+                                    {pkg.name}
+                                </h2>
+
+                                <p className="text-gray-700 leading-relaxed mb-5">
+                                    {pkg.description}
+                                </p>
+                            </div>
+
+                            <div
+                                className="
+                                    flex justify-between items-center 
+                                    border-t border-blue-300/50 
+                                    pt-4
+                                "
+                            >
+                                <p className="text-2xl font-bold text-black">
+                                    Rp {pkg.price.toLocaleString("id-ID")}
+                                </p>
+
+                                <span className="text-3xl font-bold text-red-600">
+                                    ➔
+                                </span>
+                            </div>
                         </div>
-                        <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <p style={{ fontSize: '1.5em', fontWeight: 'bold', color: '#333' }}>Rp. {pkg.price.toLocaleString('id-ID')}</p>
-                            <span style={{ fontSize: '1.5em', color: '#007bff' }}>➔</span>
-                        </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
+
+            {/* Tombol Lanjut */}
             <button
                 onClick={handleContinue}
-                style={{
-                    padding: '15px 40px',
-                    borderRadius: '30px',
-                    border: 'none',
-                    backgroundColor: '#28a745',
-                    color: 'white',
-                    fontSize: '1.2em',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    marginTop: '40px',
-                    boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
-                }}
+                className="
+                    px-10 py-3 
+                    rounded-full 
+                    border-2 border-white 
+                    text-white 
+                    bg-white/20 
+                    backdrop-blur-sm
+                    text-lg font-bold
+                    shadow-md
+                    transition-all duration-200
+                    hover:bg-white/30
+                "
             >
-                Lanjutkan
+                Lanjut ➔
             </button>
-        </Layout>
+        </div>
     );
 };
 

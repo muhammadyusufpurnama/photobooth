@@ -1,75 +1,143 @@
-// resources/js/components/Tutorial.jsx
-import React from 'react';
-import Layout from './Layout'; // Import Layout
+    import React from 'react';
 
-const Tutorial = ({ onNext, onBack }) => {
-    const steps = [
-        { id: 1, title: 'Pilih Paket', image: '/images/tutorial-paket.png' }, // Ganti dengan path gambar Anda
-        { id: 2, title: 'Pembayaran', image: '/images/tutorial-pembayaran.png' },
-        { id: 3, title: 'Pilih Frame', image: '/images/tutorial-frame.png' },
-        { id: 4, title: 'Foto & Filter', image: '/images/tutorial-foto.png' },
-        { id: 5, title: 'Cetak & Kirim File', image: '/images/tutorial-cetak.png' },
-    ];
+    const Tutorial = ({ onNext, onBack }) => {
+        const steps = [
+            { id: 1, title: 'Pilih Paket', image: '/images/ttr1.png' },
+            { id: 2, title: 'Pembayaran', image: '/images/tutorial-pembayaran.png' },
+            { id: 3, title: 'Pilih Frame', image: '/images/tutorial-frame.png' },
+            { id: 4, title: 'Foto & Filter', image: '/images/tutorial-foto.png' },
+            { id: 5, title: 'Cetak & Kirim File', image: '/images/tutorial-cetak.png' },
+        ];
 
-    return (
-        <Layout showBackButton={true} onBack={onBack}>
-            <h1 style={{ fontSize: '2.5em', marginBottom: '40px', color: '#333' }}>Langkah Berfoto Di Minarsih Photobooth</h1>
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                gap: '20px',
-                marginBottom: '40px'
-            }}>
-                {steps.map(step => (
-                    <div key={step.id} style={{
-                        backgroundColor: '#f8f9fa',
-                        padding: '15px',
-                        borderRadius: '10px',
-                        boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        minHeight: '180px'
-                    }}>
-                        <span style={{
-                            display: 'block',
-                            width: '30px',
-                            height: '30px',
-                            borderRadius: '50%',
-                            backgroundColor: '#007bff',
-                            color: 'white',
-                            fontWeight: 'bold',
-                            lineHeight: '30px',
-                            marginBottom: '10px'
-                        }}>{step.id}</span>
-                        <img
-                            src={step.image}
-                            alt={step.title}
-                            style={{ maxWidth: '100px', maxHeight: '100px', objectFit: 'contain', marginBottom: '10px' }}
-                        />
-                        <p style={{ fontWeight: 'bold', fontSize: '1.1em', color: '#555' }}>{step.title}</p>
-                    </div>
-                ))}
-            </div>
-            <button
-                onClick={onNext} // Fungsi ini akan berpindah ke halaman Pilih Paket
+        return (
+            <div
                 style={{
-                    padding: '15px 40px',
-                    borderRadius: '30px',
-                    border: 'none',
-                    backgroundColor: '#28a745', // Warna tombol hijau
-                    color: 'white',
-                    fontSize: '1.2em',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
+                    minHeight: '100vh',
+                    backgroundImage: 'url("/images/bg.jpg")',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    padding: '20px',
                 }}
             >
-                Lanjut ➔
-            </button>
-        </Layout>
-    );
-};
+            <button
+        onClick={onBack}
+        className="
+            absolute top-5 left-5
+            px-5 py-2
+            rounded-full
+            bg-red-500
+            text-white text-base font-medium
+            shadow-md
+            cursor-pointer
+            transition-all duration-300
+            hover:bg-red-700
+        "
+    >
+        Kembali
+    </button>
 
-export default Tutorial;
+            <h1 className="font-serif text-white font-extrabold text-3xl md:text-4xl mb-12 text-shadow">
+        Langkah Berfoto Di Minarsih Photobooth</h1>
+
+                <div
+    className="
+        grid 
+        grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5
+        gap-6 
+        mb-12 
+        max-w-4xl 
+        w-full
+    "
+>
+    {steps.map((step) => (
+        <div
+            key={step.id}
+            onClick={() => console.log(`Klik step ${step.id}`)}
+            className="
+                relative
+                bg-amber-50/80
+                border-4 border-amber-600
+                rounded-2xl
+                p-6
+                flex flex-col items-center justify-center
+                shadow-lg
+                min-h-[220px]
+                cursor-pointer
+                transition-all duration-300
+                hover:shadow-2xl hover:scale-105
+                active:scale-95 active:shadow-md
+            "
+        >
+            {/* Step Number – pojok kiri atas */}
+            <span
+                className="
+                    absolute top-3 left-3
+                    w-9 h-9
+                    flex items-center justify-center
+                    rounded-full
+                    bg-white/60 text-black
+                    font-bold text-base
+                    shadow-md
+                "
+            >
+                {step.id}
+            </span>
+
+            {/* Image — jauh lebih besar & lebih menarik */}
+            <img
+                src={step.image}
+                alt={step.title}
+                className="
+                    w-38 h-38 sm:w-42 sm:h-42
+                    object-contain
+                    mb-4
+                "
+            />
+
+            {/* Title */}
+            <p
+                className="
+                    font-semibold 
+                    text-black  
+                    text-center 
+                    text-sm sm:text-base
+                "
+            >
+                {step.title}
+            </p>
+        </div>
+    ))}
+</div>
+
+                
+                <div style={{ textAlign: 'center' }}>
+                    <button
+                        onClick={onNext}
+                        style={{
+                            padding: '12px 40px',
+                            borderRadius: '25px',
+                            border: '2px solid white',
+                            backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                            color: 'white',
+                            fontSize: '1.1em',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+                            transition: 'all 0.3s ease'
+                        }}
+                        onMouseOver={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.25)'}
+                        onMouseOut={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.15)'}
+                    >
+                        Lanjut ➔
+                    </button>
+                </div>
+            </div>
+        );
+    };
+
+    export default Tutorial;
