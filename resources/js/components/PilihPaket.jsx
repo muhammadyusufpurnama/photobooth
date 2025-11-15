@@ -90,13 +90,13 @@ const PilihPaket = ({ onNext, onBack }) => {
 
                                 ${
                                     active
-                                        ? "bg-blue-50/95 border-4 border-blue-600 scale-105 shadow-blue-300"
-                                        : "bg-blue-50/80 border-4 border-sky-300 hover:scale-105 hover:shadow-xl"
+                                        ? "bg-amber-50/95 border-4 border-amber-600 scale-105 shadow-amber-300"
+                                        : "bg-amber-50/80 border-4 border-amber-400 hover:scale-105 hover:shadow-xl"
                                 }
                             `}
                         >
                             <div>
-                                <h2 className="text-2xl font-bold text-blue-700 mb-3">
+                                <h2 className="text-2xl font-bold text-amber-700 mb-3">
                                     {pkg.name}
                                 </h2>
 
@@ -108,7 +108,7 @@ const PilihPaket = ({ onNext, onBack }) => {
                             <div
                                 className="
                                     flex justify-between items-center 
-                                    border-t border-blue-300/50 
+                                    border-t border-amber-300/50 
                                     pt-4
                                 "
                             >
