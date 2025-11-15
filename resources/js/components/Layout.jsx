@@ -3,27 +3,31 @@ import React from 'react';
 
 const Layout = ({ children, showBackButton = false, onBack }) => {
     return (
-        <div style={{
-            minHeight: '100vh',
-            backgroundColor: '#e0f2f7', // Warna biru muda
-            backgroundImage: 'radial-gradient(#ffffff 1px, transparent 0)',
-            backgroundSize: '20px 20px', // Ukuran dot pattern
-            backgroundPosition: '0 0,10px 10px',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: '20px'
-        }}>
-            <div style={{
-                backgroundColor: 'white', // Konten dalam box putih
-                borderRadius: '15px',
-                padding: '20px 40px',
-                boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
-                textAlign: 'center',
-                maxWidth: '600px',
-                width: '100%',
-                position: 'relative' // Untuk posisi tombol kembali
-            }}>
+        <div
+            style={{
+                minHeight: '100vh',
+                backgroundImage: 'url("/images/bg.jpg")', // ⬅️ Gambar background
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                padding: '20px'
+            }}
+        >
+               <div
+                style={{
+                    backgroundColor: 'rgba(0,0,0,0.9)',
+                    borderRadius: '15px',
+                    padding: '20px 40px',
+                    boxShadow: 'none',
+                    textAlign: 'center',
+                    maxWidth: '600px',
+                    width: '100%',
+                    position: 'relative'
+                }}
+            >
                 {showBackButton && (
                     <button
                         onClick={onBack}
@@ -34,7 +38,7 @@ const Layout = ({ children, showBackButton = false, onBack }) => {
                             padding: '10px 20px',
                             borderRadius: '25px',
                             border: 'none',
-                            backgroundColor: '#007bff', // Warna tombol biru
+                            backgroundColor: '#007bff',
                             color: 'white',
                             fontSize: '16px',
                             cursor: 'pointer',

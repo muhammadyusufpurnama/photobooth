@@ -2,9 +2,12 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 // Tambahkan impor Laravel Plugin
 import laravel from 'laravel-vite-plugin';
+import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
+    fontfamily: 'Bestie, cursive',
     plugins: [
+        tailwindcss(),
         // [Wajib] Plugin Laravel
         laravel({
             input: [
