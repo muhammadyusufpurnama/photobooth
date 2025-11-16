@@ -1,7 +1,7 @@
 // resources/js/components/AddOn.jsx
 import React, { useState, useMemo } from "react";
 
-const AddOn = ({ onNext, onBack }) => {
+const AddOn = ({ onNext, onBack, bookingData }) => {
     const [extraPrints, setExtraPrints] = useState(0);
     const [extraTime, setExtraTime] = useState(0);
 
@@ -33,7 +33,7 @@ const AddOn = ({ onNext, onBack }) => {
             extraTime,
             totalPrintCost,
             totalTimeCost,
-            grandTotal
+            addOnPrice: grandTotal
         });
     };
 
@@ -137,7 +137,7 @@ const AddOn = ({ onNext, onBack }) => {
 
             {/* Summary / Ringkasan Total */}
             <div className="bg-white/20 backdrop-blur-md border border-white text-white px-8 py-4 rounded-2xl shadow mb-8 text-center">
-                <h3 className="text-xl font-semibold mb-1">Total Keseluruhan</h3>
+                <h3 className="text-xl font-semibold mb-1">Total Add On</h3>
                 <p className="text-3xl font-extrabold">
                     Rp {grandTotal.toLocaleString("id-ID")}
                 </p>

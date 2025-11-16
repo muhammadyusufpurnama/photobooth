@@ -10,19 +10,26 @@ const PilihPaket = ({ onNext, onBack }) => {
             name: "Paket Vintage",
             description:
                 "Paket photobooth Vintage, unlimited retake, dengan 12 hasil print foto dan waktu 12 menit.",
-            price: 12000,
+            price: 120000,
         },
         {
             id: "retro",
             name: "Paket Retro",
             description:
                 "Paket photobooth Retro, unlimited retake, dengan 12 hasil print foto dan waktu 15 menit.",
-            price: 19000,
+            price: 190000,
         },
     ];
 
     const handleContinue = () => {
-        if (selectedPackage) return onNext(selectedPackage);
+        if (selectedPackage) {
+            const selected = packages.find((pkg) => pkg.id === selectedPackage);
+            return onNext({
+                id: selected.id,
+                name: selected.name,
+                price: selected.price,
+            });
+        }
         alert("Silakan pilih paket terlebih dahulu.");
     };
 
@@ -83,24 +90,54 @@ const PilihPaket = ({ onNext, onBack }) => {
                             onClick={() => setSelectedPackage(pkg.id)}
                             className={`
                                 cursor-pointer 
-                                p-7 rounded-xl shadow-lg 
+                                p-7 rounded-xl 
                                 flex flex-col justify-between
                                 min-h-[260px]
                                 transition-all duration-300
+                                relative
 
                                 ${
                                     active
-                                        ? "bg-amber-50/95 border-4 border-amber-600 scale-105 shadow-amber-300"
-                                        : "bg-amber-50/80 border-4 border-amber-400 hover:scale-105 hover:shadow-xl"
+                                        ? "bg-white/95 border-4 border-amber-600 scale-105"
+                                        : "bg-white/85 border-4 border-orange-400 hover:scale-105"
                                 }
                             `}
+                            style={
+                                active
+                                    ? {
+                                        boxShadow: `
+                                            0 0 30px rgba(217, 119, 6, 0.8),
+                                            0 0 60px rgba(217, 119, 6, 0.5),
+                                            0 0 90px rgba(217, 119, 6, 0.3),
+                                            0 10px 40px rgba(0, 0, 0, 0.3)
+                                        `,
+                                      }
+                                    : {
+                                        boxShadow: `0 4px 15px rgba(0, 0, 0, 0.15)`,
+                                      }
+                            }
                         >
-                            <div>
-                                <h2 className="text-2xl font-bold text-amber-700 mb-3">
+                            {/* Efek Glow Background */}
+                            {active && (
+                                <div
+                                    className="
+                                        absolute inset-0 rounded-xl
+                                        opacity-0 animate-pulse
+                                    "
+                                    style={{
+                                        background: `radial-gradient(circle, rgba(217, 119, 6, 0.3) 0%, transparent 70%)`,
+                                        animation: "glow 2s ease-in-out infinite",
+                                    }}
+                                />
+                            )}
+
+                            {/* Content */}
+                            <div className="relative z-10">
+                                <h2 className="text-2xl font-bold text-amber-600 mb-3">
                                     {pkg.name}
                                 </h2>
 
-                                <p className="text-gray-700 leading-relaxed mb-5">
+                                <p className="text-gray-700 leading-relaxed mb-5 text-sm">
                                     {pkg.description}
                                 </p>
                             </div>
@@ -108,17 +145,25 @@ const PilihPaket = ({ onNext, onBack }) => {
                             <div
                                 className="
                                     flex justify-between items-center 
-                                    border-t border-amber-300/50 
+                                    border-t border-gray-300 
                                     pt-4
+                                    relative z-10
                                 "
                             >
-                                <p className="text-2xl font-bold text-black">
+                                <p className="text-2xl font-bold text-red-600">
                                     Rp {pkg.price.toLocaleString("id-ID")}
                                 </p>
 
-                                <span className="text-3xl font-bold text-red-600">
-                                    ➔
-                                </span>
+                                {active && (
+                                    <span className="text-2xl text-amber-600 font-bold animate-bounce">
+                                        ✓
+                                    </span>
+                                )}
+                                {!active && (
+                                    <span className="text-3xl font-bold text-gray-400">
+                                        ➔
+                                    </span>
+                                )}
                             </div>
                         </div>
                     );
@@ -143,6 +188,18 @@ const PilihPaket = ({ onNext, onBack }) => {
             >
                 Lanjut ➔
             </button>
+
+            {/* CSS Keyframes untuk Glow Effect */}
+            <style>{`
+                @keyframes glow {
+                    0%, 100% {
+                        box-shadow: 0 0 20px rgba(217, 119, 6, 0.5);
+                    }
+                    50% {
+                        box-shadow: 0 0 40px rgba(217, 119, 6, 0.8);
+                    }
+                }
+            `}</style>
         </div>
     );
 };
