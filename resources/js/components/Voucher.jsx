@@ -1,91 +1,104 @@
 // resources/js/components/Voucher.jsx
-import React, { useState } from 'react';
-import Layout from './Layout';
+import React, { useState } from "react";
 
 const Voucher = ({ onNext, onBack }) => {
-    const [voucherCode, setVoucherCode] = useState('');
-
-    const handleVoucherChange = (event) => {
-        setVoucherCode(event.target.value);
-    };
+    const [voucherCode, setVoucherCode] = useState("");
+    const [appliedVoucher, setAppliedVoucher] = useState(null);
 
     const handleApplyVoucher = () => {
-        // Di sini Anda akan mengirim voucherCode ke backend untuk validasi
-        console.log('Menerapkan voucher:', voucherCode);
-        alert(`Voucher "${voucherCode}" diterapkan (simulasi).`);
-        // Setelah validasi, Anda mungkin akan menyimpan status voucher atau diskon
+        if (!voucherCode.trim()) {
+            alert("Silakan masukkan kode voucher");
+            return;
+        }
+        setAppliedVoucher(voucherCode);
+        alert(`Voucher "${voucherCode}" berhasil diterapkan!`);
     };
 
     const handleContinue = () => {
-        // Lanjutkan ke halaman pembayaran, mungkin kirim voucherCode juga
         onNext(voucherCode);
     };
 
     return (
-        <Layout showBackButton={true} onBack={onBack}>
-            <h1 style={{ fontSize: '2.5em', marginBottom: '40px', color: '#333' }}>Voucher</h1>
-            <div style={{
-                backgroundColor: '#f8f9fa',
-                border: '1px solid #ccc',
-                borderRadius: '15px',
-                padding: '40px',
-                width: '100%',
-                maxWidth: '500px',
-                margin: '0 auto',
-                boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
-            }}>
-                <h2 style={{ fontSize: '1.8em', marginBottom: '20px', color: '#007bff' }}>Isi Voucher Jika Ada</h2>
-                <p style={{ fontSize: '1.1em', color: '#666', marginBottom: '20px' }}>Kode voucher (opsional)</p>
+        <div className="
+            min-h-screen bg-[url('/images/bg.jpg')] bg-cover bg-center 
+            flex flex-col items-center justify-center p-5 relative
+        ">
+            {/* Back Button */}
+            <button
+                onClick={onBack}
+                className="
+                    absolute top-5 left-5 px-5 py-2 rounded-full 
+                    bg-amber-600 text-white font-medium shadow 
+                    hover:bg-amber-700 transition
+                "
+            >
+                Kembali
+            </button>
+
+            {/* Title */}
+            <h1 className="text-4xl font-extrabold text-white drop-shadow mb-10">
+                Voucher
+            </h1>
+
+            {/* Voucher Card */}
+            <div className="
+                bg-white/90 border-2 border-amber-600 rounded-2xl shadow-xl
+                p-8 w-full max-w-lg
+            ">
+                <h2 className="text-xl font-bold text-amber-600 mb-2">
+                    Isi Voucher Jika Ada
+                </h2>
+                <p className="text-gray-600 mb-4 text-sm">
+                    Kode voucher (opsional)
+                </p>
+
+                {/* Input */}
                 <input
                     type="text"
                     value={voucherCode}
-                    onChange={handleVoucherChange}
+                    onChange={(e) => setVoucherCode(e.target.value)}
                     placeholder="Masukkan kode voucher Anda"
-                    style={{
-                        width: 'calc(100% - 20px)',
-                        padding: '12px 10px',
-                        marginBottom: '20px',
-                        borderRadius: '8px',
-                        border: '1px solid #ddd',
-                        fontSize: '1.1em'
-                    }}
+                    className="
+                        w-full p-3 rounded-xl border-2 border-green-300 
+                        focus:border-amber-600 outline-none transition 
+                        text-gray-700
+                    "
                 />
+
+                {/* Applied Voucher Notification */}
+                {appliedVoucher && (
+                    <div className="
+                        bg-green-100 border-2 border-green-500 text-green-700 
+                        rounded-xl p-3 mt-4 font-semibold text-sm
+                    ">
+                        ✓ Voucher "{appliedVoucher}" berhasil diterapkan
+                    </div>
+                )}
+
+                {/* Apply Button */}
                 <button
                     onClick={handleApplyVoucher}
-                    style={{
-                        padding: '12px 25px',
-                        borderRadius: '25px',
-                        border: 'none',
-                        backgroundColor: '#ffc107', // Warna kuning
-                        color: 'white',
-                        fontSize: '1.1em',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                        boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
-                        marginBottom: '30px'
-                    }}
+                    className="
+                        w-full mt-6 py-3 rounded-full bg-green-400 text-white 
+                        font-bold text-lg shadow hover:bg-green-500 transition
+                    "
                 >
-                    Gunakan kode voucher
+                    Gunakan Kode Voucher
                 </button>
             </div>
+
+            {/* Continue Button */}
             <button
                 onClick={handleContinue}
-                style={{
-                    padding: '15px 40px',
-                    borderRadius: '30px',
-                    border: 'none',
-                    backgroundColor: '#28a745',
-                    color: 'white',
-                    fontSize: '1.2em',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    marginTop: '40px',
-                    boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
-                }}
+                className="
+                    mt-10 px-10 py-3 rounded-full text-white font-bold text-lg
+                    bg-white/20 border border-white shadow 
+                    hover:bg-white/30 transition
+                "
             >
-                Lanjutkan
+                Lanjut ➔
             </button>
-        </Layout>
+        </div>
     );
 };
 

@@ -1,134 +1,161 @@
 // resources/js/components/AddOn.jsx
-import React, { useState } from 'react';
-import Layout from './Layout';
+import React, { useState, useMemo } from "react";
 
-const AddOn = ({ onNext, onBack, selectedPackage }) => {
+const AddOn = ({ onNext, onBack }) => {
     const [extraPrints, setExtraPrints] = useState(0);
     const [extraTime, setExtraTime] = useState(0);
 
     const pricePerPrint = 20000;
     const pricePerMinute = 12000;
 
-    const handlePrintsChange = (change) => {
-        setExtraPrints(prev => Math.max(0, prev + change));
+    const handleChange = (setter, value) => {
+        setter(prev => Math.max(0, prev + value));
     };
 
-    const handleTimeChange = (change) => {
-        setExtraTime(prev => Math.max(0, prev + change));
-    };
+    const totalPrintCost = useMemo(
+        () => extraPrints * pricePerPrint,
+        [extraPrints]
+    );
+
+    const totalTimeCost = useMemo(
+        () => extraTime * pricePerMinute,
+        [extraTime]
+    );
+
+    const grandTotal = useMemo(
+        () => totalPrintCost + totalTimeCost,
+        [totalPrintCost, totalTimeCost]
+    );
 
     const handleContinue = () => {
-        // Kirim data add-on yang dipilih ke halaman berikutnya
-        onNext({ extraPrints, extraTime });
+        onNext({
+            extraPrints,
+            extraTime,
+            totalPrintCost,
+            totalTimeCost,
+            grandTotal
+        });
     };
 
     return (
-        <Layout showBackButton={true} onBack={onBack}>
-            <h1 style={{ fontSize: '2.5em', marginBottom: '40px', color: '#333' }}>Add On</h1>
-            <div style={{
-                display: 'flex',
-                gap: '30px',
-                justifyContent: 'center',
-                flexWrap: 'wrap'
-            }}>
-                {/* Opsi Cetak Foto Tambahan */}
-                <div style={{
-                    backgroundColor: '#f8f9fa',
-                    border: '1px solid #ccc',
-                    borderRadius: '15px',
-                    padding: '30px',
-                    width: '350px',
-                    textAlign: 'left',
-                    boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
-                }}>
-                    <h2 style={{ fontSize: '1.8em', marginBottom: '10px', color: '#007bff' }}>Mau Cetak Foto Tambahan?</h2>
-                    <p style={{ fontSize: '1.1em', color: '#666', lineHeight: '1.5', marginBottom: '20px' }}>
-                        Cetak foto tambahan dengan harga Rp {pricePerPrint.toLocaleString('id-ID')} per cetak. (opsional)
+        <div className="min-h-screen bg-[url('/images/bg.jpg')] bg-cover bg-center p-5 flex flex-col items-center justify-center relative">
+            
+            {/* Back */}
+            <button
+                onClick={onBack}
+                className="absolute top-5 left-5 px-5 py-2 rounded-full bg-red-600 text-white font-medium shadow hover:bg-red-700 transition"
+            >
+                Kembali
+            </button>
+
+            <h1 className="text-4xl text-white font-extrabold drop-shadow mb-10">
+                Add On
+            </h1>
+
+            <div className="flex flex-wrap justify-center gap-8 max-w-5xl mb-10">
+
+                {/* Card – Cetak Foto Tambahan */}
+                <div className="bg-white/80 border-2 border-amber-600 rounded-2xl p-6 w-80 shadow-xl flex flex-col text-center">
+                    <h2 className="text-xl font-bold text-amber-600 mb-2">
+                        Cetak Foto Tambahan
+                    </h2>
+                    <p className="text-gray-600 mb-4">
+                        Rp {pricePerPrint.toLocaleString("id-ID")} per cetak
                     </p>
-                    {/* Gambar placeholder untuk cetak foto */}
+
                     <img
-                        src="/images/add-on-prints.png" // Ganti dengan path gambar Anda
+                        src="/images/add-on-prints.png"
+                        className="w-32 mx-auto rounded-xl mb-5"
                         alt="Cetak Foto Tambahan"
-                        style={{ maxWidth: '150px', height: 'auto', display: 'block', margin: '0 auto 20px auto' }}
                     />
-                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '20px' }}>
-                        <button onClick={() => handlePrintsChange(-1)} style={counterButtonStyle}>-</button>
-                        <span style={counterValueStyle}>{extraPrints}</span>
-                        <button onClick={() => handlePrintsChange(1)} style={counterButtonStyle}>+</button>
+
+                    <div className="flex items-center justify-center gap-4 mb-5">
+                        <button
+                            onClick={() => handleChange(setExtraPrints, -1)}
+                            className="w-10 h-10 rounded-full bg-amber-600 text-white text-xl font-bold flex items-center justify-center hover:bg-amber-700 transition"
+                        >
+                            −
+                        </button>
+
+                        <span className="text-3xl font-bold text-black w-12 text-center">
+                            {extraPrints}
+                        </span>
+
+                        <button
+                            onClick={() => handleChange(setExtraPrints, 1)}
+                            className="w-10 h-10 rounded-full bg-amber-600 text-white text-xl font-bold flex items-center justify-center hover:bg-amber-700 transition"
+                        >
+                            +
+                        </button>
                     </div>
-                    <p style={{ fontSize: '1.4em', fontWeight: 'bold', color: '#333', marginTop: '15px' }}>
-                        Rp {(extraPrints * pricePerPrint).toLocaleString('id-ID')}
+
+                    <p className="text-2xl font-bold text-black">
+                        Rp {totalPrintCost.toLocaleString("id-ID")}
                     </p>
                 </div>
 
-                {/* Opsi Waktu Foto Tambahan */}
-                <div style={{
-                    backgroundColor: '#f8f9fa',
-                    border: '1px solid #ccc',
-                    borderRadius: '15px',
-                    padding: '30px',
-                    width: '350px',
-                    textAlign: 'left',
-                    boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
-                }}>
-                    <h2 style={{ fontSize: '1.8em', marginBottom: '10px', color: '#007bff' }}>Mau Waktu Foto Tambahan?</h2>
-                    <p style={{ fontSize: '1.1em', color: '#666', lineHeight: '1.5', marginBottom: '20px' }}>
-                        Tambahkan waktu tambahan dengan harga Rp {pricePerMinute.toLocaleString('id-ID')} per menit (opsional)
+                {/* Card – Waktu Foto Tambahan */}
+                <div className="bg-white/80 border-2 border-amber-600 rounded-2xl p-6 w-80 shadow-xl flex flex-col text-center">
+                    <h2 className="text-xl font-bold text-amber-600 mb-2">
+                        Waktu Foto Tambahan
+                    </h2>
+                    <p className="text-gray-600 mb-4">
+                        Rp {pricePerMinute.toLocaleString("id-ID")} per menit
                     </p>
-                    {/* Gambar placeholder untuk waktu tambahan */}
+
                     <img
-                        src="/images/add-on-time.png" // Ganti dengan path gambar Anda
+                        src="/images/add-on-time.png"
+                        className="w-32 mx-auto rounded-xl mb-5"
                         alt="Waktu Foto Tambahan"
-                        style={{ maxWidth: '150px', height: 'auto', display: 'block', margin: '0 auto 20px auto' }}
                     />
-                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '20px' }}>
-                        <button onClick={() => handleTimeChange(-1)} style={counterButtonStyle}>-</button>
-                        <span style={counterValueStyle}>{extraTime}</span>
-                        <button onClick={() => handleTimeChange(1)} style={counterButtonStyle}>+</button>
+
+                    <div className="flex items-center justify-center gap-4 mb-5">
+                        <button
+                            onClick={() => handleChange(setExtraTime, -1)}
+                            className="w-10 h-10 rounded-full bg-amber-600 text-white text-xl font-bold flex items-center justify-center hover:bg-amber-700 transition"
+                        >
+                            −
+                        </button>
+
+                        <span className="text-3xl font-bold text-black w-12 text-center">
+                            {extraTime}
+                        </span>
+
+                        <button
+                            onClick={() => handleChange(setExtraTime, 1)}
+                            className="w-10 h-10 rounded-full bg-amber-600 text-white text-xl font-bold flex items-center justify-center hover:bg-amber-700 transition"
+                        >
+                            +
+                        </button>
                     </div>
-                    <p style={{ fontSize: '1.4em', fontWeight: 'bold', color: '#333', marginTop: '15px' }}>
-                        Rp {(extraTime * pricePerMinute).toLocaleString('id-ID')}
+
+                    <p className="text-2xl font-bold text-black">
+                        Rp {totalTimeCost.toLocaleString("id-ID")}
                     </p>
                 </div>
             </div>
+
+            {/* Summary / Ringkasan Total */}
+            <div className="bg-white/20 backdrop-blur-md border border-white text-white px-8 py-4 rounded-2xl shadow mb-8 text-center">
+                <h3 className="text-xl font-semibold mb-1">Total Keseluruhan</h3>
+                <p className="text-3xl font-extrabold">
+                    Rp {grandTotal.toLocaleString("id-ID")}
+                </p>
+            </div>
+
+            {/* Continue Button */}
             <button
                 onClick={handleContinue}
-                style={{
-                    padding: '15px 40px',
-                    borderRadius: '30px',
-                    border: 'none',
-                    backgroundColor: '#28a745',
-                    color: 'white',
-                    fontSize: '1.2em',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    marginTop: '40px',
-                    boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
-                }}
+                className="
+                    px-10 py-3 rounded-full text-white font-bold text-lg
+                    bg-white/20 border border-white shadow
+                    hover:bg-white/30 transition
+                "
             >
-                Lanjutkan
+                Lanjut ➔
             </button>
-        </Layout>
+        </div>
     );
-};
-
-const counterButtonStyle = {
-    padding: '8px 15px',
-    borderRadius: '50%',
-    border: '1px solid #007bff',
-    backgroundColor: '#007bff',
-    color: 'white',
-    fontSize: '1.2em',
-    cursor: 'pointer',
-    margin: '0 10px'
-};
-
-const counterValueStyle = {
-    fontSize: '1.5em',
-    fontWeight: 'bold',
-    color: '#333',
-    minWidth: '30px',
-    textAlign: 'center'
 };
 
 export default AddOn;
