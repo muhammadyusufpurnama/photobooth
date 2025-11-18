@@ -1,8 +1,7 @@
 // resources/js/app.jsx
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-
-// Import semua komponen halaman Anda
+import Home from './components/Home';
 import Tutorial from './components/Tutorial';
 import PilihPaket from './components/PilihPaket';
 import AddOn from './components/AddOn';
@@ -10,7 +9,7 @@ import Voucher from './components/Voucher';
 import PilihPembayaran from './components/PilihPembayaran';
 
 const App = () => {
-    const [currentStep, setCurrentStep] = useState('tutorial');
+    const [currentStep, setCurrentStep] = useState('home');
     const [bookingData, setBookingData] = useState({
         package: null,
         packageName: '',
@@ -23,6 +22,10 @@ const App = () => {
         voucherCode: '',
         discountAmount: 0
     });
+
+    const handleHomeNext = () => {
+        setCurrentStep('tutorial');
+    };
 
     const handleTutorialNext = () => {
         setCurrentStep('pilihPaket');
@@ -61,22 +64,26 @@ const App = () => {
 
     const handlePembayaranNext = (paymentData) => {
         console.log('Final Booking Data:', { ...bookingData, ...paymentData });
-        // Lanjut ke halaman konfirmasi atau proses pembayaran
         setCurrentStep('confirmation');
     };
 
     const handleBack = () => {
         const stepMap = {
+            'home': 'home',
+            'tutorial': 'home',
             'pilihPaket': 'tutorial',
             'addOn': 'pilihPaket',
             'voucher': 'addOn',
             'pilihPembayaran': 'voucher'
         };
-        setCurrentStep(stepMap[currentStep] || 'tutorial');
+        setCurrentStep(stepMap[currentStep] || 'home');
     };
 
     return (
         <div>
+            {currentStep === 'home' && (
+                <Home onNext={handleHomeNext} />
+            )}
             {currentStep === 'tutorial' && (
                 <Tutorial onNext={handleTutorialNext} onBack={handleBack} />
             )}
