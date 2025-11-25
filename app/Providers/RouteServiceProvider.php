@@ -1,48 +1,51 @@
 <?php
 
-// app/Providers/RouteServiceProvider.php
+namespace App\Providers;
 
-use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider; // Pastikan ini diimpor
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
-
-// ... (Pastikan Anda menggunakan kelas RouteServiceProvider, bukan AppServiceProvider)
 
 class RouteServiceProvider extends ServiceProvider
 {
-    // ... properti kelas
-
-    // ... (Jika Laravel Anda versi lama, Anda mungkin perlu menambahkan namespace controller di sini)
+    /**
+     * The path to your application's "home" route.
+     *
+     * Typically, users are redirected here after authentication.
+     *
+     * @var string
+     */
+    public const HOME = '/home';
 
     /**
      * Define your route model bindings, pattern filters, and other route configuration.
      */
     public function boot(): void
     {
-        // *** Ini adalah tempat untuk configureRateLimiting() ***
-        $this->configureRateLimiting(); // Panggil fungsi yang ada di RouteServiceProvider
+        $this->configureRateLimiting();
 
         $this->routes(function () {
-            // Memuat Rute API
+
+            // PASTIKAN BLOK INI ADA DAN TIDAK DI-KOMENTAR
             Route::prefix('api')
                 ->middleware('api')
-                // Hapus ->namespace($this->namespace) jika menggunakan Controller modern
                 ->group(base_path('routes/api.php'));
 
-            // Memuat Rute Web
+            // Bagian ini sudah pasti ada karena rute web Anda terbaca
             Route::middleware('web')
-                // Hapus ->namespace($this->namespace) jika menggunakan Controller modern
                 ->group(base_path('routes/web.php'));
         });
     }
 
-    // Pastikan metode configureRateLimiting() ada di file ini atau di trait yang digunakan
-    protected function configureRateLimiting()
+    /**
+     * Configure the rate limiters for the application.
+     */
+    protected function configureRateLimiting(): void
     {
-        // Logika default rate limiting
-        Illuminate\Support\Facades\RateLimiter::for('api', function (Illuminate\Http\Request $request) {
-            return Illuminate\Cache\RateLimiting\Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+        RateLimiter::for('api', function (Request $request) {
+            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
-
-        // Pastikan Anda memindahkan semua helper method dari AppServiceProvider ke sini (jika ada)
     }
 }

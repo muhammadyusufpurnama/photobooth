@@ -38,8 +38,21 @@ const AddOn = ({ onNext, onBack }) => {
     };
 
     return (
-        <div className="min-h-screen bg-[url('/images/bg.jpg')] bg-cover bg-center p-5 flex flex-col items-center justify-center relative">
-            
+        <div className="min-h-screen bg-[url('/images/bg.jpg')] bg-cover bg-center p-5 flex flex-col items-center justify-center relative"
+            style={{
+                    minHeight: '100vh',
+                    backgroundImage: 'url("/images/bg.jpg")',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    padding: '20px',
+                }}
+        >
+
             {/* Back */}
             <button
                 onClick={onBack}

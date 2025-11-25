@@ -15,170 +15,175 @@ class PaymentController extends Controller
 
     public function __construct()
     {
-        // Ambil konfigurasi dari .env
-        $this->clientId = env('DOKU_CLIENT_ID');
-        $this->secretKey = env('DOKU_SECRET_KEY');
-        // Pastikan DOKU_BASE_URL mengarah ke Sandbox/Production yang benar
-        $this->baseUrl = env('DOKU_BASE_URL', 'https://sandbox.doku.com/api/');
+        $this->clientId = config('doku.client_id');
+        $this->secretKey = config('doku.secret_key');
+
+        // PERBAIKAN 1: Pastikan Base URL bersih, tanpa '/api' di belakangnya
+        // Jika di .env Anda ada '/api', kode ini akan membersihkannya
+        $urlFromConfig = config('doku.base_url', 'https://api-sandbox.doku.com');
+        $this->baseUrl = rtrim($urlFromConfig, '/api/');
+        // Hasilnya akan selalu: https://api-sandbox.doku.com
     }
 
-    /**
-     * Menghitung DOKU Signature untuk Request API.
-     */
-    private function generateSignature($requestId, $timestamp, $targetPath, $body)
+    private function generateDigest($bodyString)
     {
-        $bodyJson = json_encode($body);
+        // Hash langsung dari string JSON, bukan array
+        $hash = hash('sha256', $bodyString, true);
 
-        // true: output raw binary data, diperlukan sebelum base64_encode
-        $digest = base64_encode(hash('sha256', $bodyJson, true));
-
-        $component =
-            "Client-Id:{$this->clientId}\n".
-            "Request-Id:{$requestId}\n".
-            "Request-Timestamp:{$timestamp}\n".
-            "Request-Target:{$targetPath}\n".
-            "Signature-Auth:true\n".
-            "Digest:{$digest}";
-
-        // false: output hex, sesuai format DOKU
-        $signature = hash_hmac('sha256', $component, $this->secretKey, false);
-
-        // Tambahkan Log untuk Signature Component (Debugging)
-        Log::debug('DOKU Signature Component String:', ['component' => $component]);
-
-        return "HMACSHA256={$signature}";
+        return base64_encode($hash);
     }
 
-    /**
-     * Dipanggil dari React untuk memulai transaksi QRIS.
-     */
+    private function generateSignature($clientId, $requestId, $requestTimestamp, $requestTarget, $digest, $secretKey)
+    {
+        $component = 'Client-Id:'.$clientId."\n";
+        $component .= 'Request-Id:'.$requestId."\n";
+        $component .= 'Request-Timestamp:'.$requestTimestamp."\n";
+        $component .= 'Request-Target:'.$requestTarget;
+
+        if ($digest) {
+            $component .= "\n";
+            $component .= 'Digest:'.$digest;
+        }
+
+        $signature = base64_encode(hash_hmac('sha256', $component, $secretKey, true));
+
+        return 'HMACSHA256='.$signature;
+    }
+
     public function generateQris(Request $request)
     {
-        // Pastikan $this->clientId dan $this->secretKey terisi
-        if (!$this->clientId || !$this->secretKey) {
-            Log::error('DOKU Credentials Missing', ['client_id' => $this->clientId, 'secret_key_present' => !empty($this->secretKey)]);
+        $requestId = (string) Str::uuid();
+        $timestamp = gmdate("Y-m-d\TH:i:s\Z");
 
-            return response()->json(['success' => false, 'message' => 'Konfigurasi DOKU (Client ID/Secret Key) hilang.'], 500);
-        }
+        // PERBAIKAN 2: Path yang BENAR untuk DOKU v2 (Tanpa /api di depan)
+        $path = '/checkout/v1/payment';
 
-        $orderId = (string) Str::uuid(); // Gunakan ID transaksi unik
-        $targetPath = '/api/v1/qr-payment/generate';
-        // Pastikan format ISO 8601 dengan 'Z' (UTC/Zulu time)
-        $timestamp = now()->toIso8601String().'Z';
-        $amount = $request->input('total_amount');
-
-        // Pastikan amount valid
-        if (!$amount || $amount < 1000) {
-            return response()->json(['success' => false, 'message' => 'Jumlah pembayaran tidak valid (min. Rp 1.000).'], 400);
-        }
+        $amount = (int) $request->input('total_amount', 10000);
 
         $body = [
             'order' => [
-                'invoice_number' => $orderId,
-                'amount' => (int) $amount,
+                'amount' => $amount,
+                'invoice_number' => $requestId,
+                'currency' => 'IDR',
+                'callback_url' => 'https://google.com/', // Ganti nanti
+                'auto_redirect' => false, // Tambahan opsional
             ],
             'payment' => [
-                'payment_due_date' => 60, // QR valid 60 menit
+                'payment_due_date' => 60,
+                'payment_method_types' => ['QRIS'],
             ],
             'customer' => [
-                // 'name' => 'John Doe', // Opsional: data pelanggan
+                'id' => 'CUST-001',
+                'name' => 'User Photobooth',
+                'email' => 'guest@example.com', // Tambahkan email dummy
+                'phone' => '6281200000000',
+                'country' => 'ID',
             ],
         ];
 
-        $signature = $this->generateSignature($orderId, $timestamp, $targetPath, $body);
+        // PERBAIKAN 3: Encode JSON dengan UNESCAPED_SLASHES
+        // Ini SANGAT PENTING agar Signature valid!
+        $jsonBody = json_encode($body, JSON_UNESCAPED_SLASHES);
+
+        // 1. Generate Digest dari String JSON
+        $digest = $this->generateDigest($jsonBody);
+
+        // 2. Generate Signature
+        $signature = $this->generateSignature(
+            $this->clientId,
+            $requestId,
+            $timestamp,
+            $path,
+            $digest,
+            $this->secretKey
+        );
 
         try {
-            // Log data yang akan dikirim sebelum request
-            Log::info('DOKU QRIS Request Payload:', ['url' => $this->baseUrl.ltrim($targetPath, '/'), 'headers' => [
-                'Client-Id' => $this->clientId,
-                'Request-Id' => $orderId,
-                'Request-Timestamp' => $timestamp,
-                'Request-Target' => $targetPath,
-                'Signature' => $signature,
-            ], 'body' => $body]);
+            // Log Request untuk Debugging
+            Log::info('DOKU Request:', [
+                'url' => $this->baseUrl.$path,
+                'headers' => [
+                    'Client-Id' => $this->clientId,
+                    'Signature' => $signature,
+                ],
+                'body' => $jsonBody,
+            ]);
 
             $response = Http::withHeaders([
                 'Client-Id' => $this->clientId,
-                'Request-Id' => $orderId,
+                'Request-Id' => $requestId,
                 'Request-Timestamp' => $timestamp,
-                'Request-Target' => $targetPath,
                 'Signature' => $signature,
                 'Content-Type' => 'application/json',
-            ])->post($this->baseUrl.ltrim($targetPath, '/'), $body);
+            ])
+            ->withBody($jsonBody, 'application/json') // Kirim Raw Body
+            ->post($this->baseUrl.$path);
 
-            // Dapatkan data JSON dan log status DOKU
             $data = $response->json();
-            Log::info('DOKU QRIS Raw Response:', ['status' => $response->status(), 'data' => $data]);
 
-            if ($response->successful() && isset($data['response']['payment']['url'])) {
-                Log::info('DOKU QRIS Generation SUCCESS', ['orderId' => $orderId]);
+            // Log Response untuk Debugging
+            Log::info('DOKU Response:', $data);
 
+            if ($response->successful()) {
                 return response()->json([
                     'success' => true,
-                    'order_id' => $orderId,
+                    'invoice_number' => $requestId,
                     'qris_url' => $data['response']['payment']['url'],
-                    'message' => 'QRIS berhasil dibuat.',
                 ]);
             } else {
-                // Jika DOKU merespons non-200 atau struktur JSON salah
-                Log::error("DOKU QRIS API Failure: Status {$response->status()}", ['dokuResponse' => $data]);
-
-                $errorMessage = $data['error']['message']['en'] ?? 'Terjadi kesalahan dari API DOKU (Non-Signature Error).';
-
-                return response()->json(['success' => false, 'message' => $errorMessage, 'details' => $data], $response->status());
+                // Kirim pesan error asli dari DOKU ke frontend
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Gagal Generate QRIS',
+                    'debug' => $data,
+                ], 400);
             }
         } catch (\Exception $e) {
-            // Log koneksi error (misalnya: Host not found, cURL error)
-            Log::critical('DOKU Connection Exception:', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            Log::error('DOKU Connection Error: '.$e->getMessage());
 
-            return response()->json(['success' => false, 'message' => 'Kesalahan Koneksi Jaringan Server (cURL Error).'], 500);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 
-    /**
-     * Dipanggil otomatis oleh DOKU (WEBHOOK) saat status transaksi berubah.
-     */
-    public function handleNotification(Request $request)
+    public function checkStatus($invoice_number)
     {
-        $data = $request->all();
-        // Path harus dimulai dengan slash
-        $targetPath = '/'.$request->path();
+        $requestId = (string) Str::uuid();
+        $timestamp = gmdate("Y-m-d\TH:i:s\Z");
 
-        Log::info('DOKU Webhook Received', ['data' => $data, 'headers' => $request->headers->all()]);
+        // Path Check Status
+        $path = '/orders/v1/status/'.$invoice_number;
 
-        // 1. Verifikasi Keamanan Webhook
+        $signature = $this->generateSignature(
+            $this->clientId,
+            $requestId,
+            $timestamp,
+            $path,
+            null,
+            $this->secretKey
+        );
+
         try {
-            $requestId = $request->header('Request-Id');
-            $timestamp = $request->header('Request-Timestamp');
-            $signatureHeader = $request->header('Signature'); // Signature yang dikirim DOKU
+            $response = Http::withHeaders([
+                'Client-Id' => $this->clientId,
+                'Request-Id' => $requestId,
+                'Request-Timestamp' => $timestamp,
+                'Signature' => $signature,
+            ])->get($this->baseUrl.$path);
 
-            // Hitung signature lokal untuk validasi
-            $calculatedSignature = $this->generateSignature($requestId, $timestamp, $targetPath, $data);
+            $data = $response->json();
 
-            if ($calculatedSignature !== $signatureHeader) {
-                Log::warning('DOKU Webhook Invalid Signature', ['received' => $signatureHeader, 'calculated' => $calculatedSignature]);
+            if ($response->successful()) {
+                $status = $data['transaction']['status'] ?? 'PENDING';
 
-                return response('Invalid Signature', 400); // Tolak jika signature tidak cocok
+                return response()->json([
+                    'success' => true,
+                    'status' => $status,
+                ]);
+            } else {
+                return response()->json(['success' => false, 'status' => 'NOT_FOUND'], 404);
             }
-
-            // 2. Proses Status Transaksi
-            $transactionStatus = $data['transaction']['status'] ?? null;
-            $orderId = $data['order']['invoice_number'] ?? null;
-
-            if ($transactionStatus === 'SUCCESS' && $orderId) {
-                // TODO: Logika Update Status Transaksi di Database
-                Log::info("Transaction {$orderId} marked as PAID.");
-
-                return response('SUCCESS', 200);
-            }
-
-            Log::info("DOKU Webhook Status: {$transactionStatus} for {$orderId}");
-
-            return response('SUCCESS', 200);
         } catch (\Exception $e) {
-            Log::error('DOKU Webhook Error Processing', ['error' => $e->getMessage()]);
-
-            return response('INTERNAL SERVER ERROR', 500); // Beri tahu DOKU ada masalah
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 }

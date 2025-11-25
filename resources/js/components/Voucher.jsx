@@ -20,15 +20,27 @@ const Voucher = ({ onNext, onBack }) => {
 
     return (
         <div className="
-            min-h-screen bg-[url('/images/bg.jpg')] bg-cover bg-center 
+            min-h-screen bg-[url('/images/bg.jpg')] bg-cover bg-center
             flex flex-col items-center justify-center p-5 relative
-        ">
+        "
+            style={{
+                    minHeight: '100vh',
+                    backgroundImage: 'url("/images/bg.jpg")',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    padding: '20px',
+                }}>
             {/* Back Button */}
             <button
                 onClick={onBack}
                 className="
-                    absolute top-5 left-5 px-5 py-2 rounded-full 
-                    bg-amber-600 text-white font-medium shadow 
+                    absolute top-5 left-5 px-5 py-2 rounded-full
+                    bg-amber-600 text-white font-medium shadow
                     hover:bg-amber-700 transition
                 "
             >
@@ -59,8 +71,8 @@ const Voucher = ({ onNext, onBack }) => {
                     onChange={(e) => setVoucherCode(e.target.value)}
                     placeholder="Masukkan kode voucher Anda"
                     className="
-                        w-full p-3 rounded-xl border-2 border-green-300 
-                        focus:border-amber-600 outline-none transition 
+                        w-full p-3 rounded-xl border-2 border-green-300
+                        focus:border-amber-600 outline-none transition
                         text-gray-700
                     "
                 />
@@ -68,7 +80,7 @@ const Voucher = ({ onNext, onBack }) => {
                 {/* Applied Voucher Notification */}
                 {appliedVoucher && (
                     <div className="
-                        bg-green-100 border-2 border-green-500 text-green-700 
+                        bg-green-100 border-2 border-green-500 text-green-700
                         rounded-xl p-3 mt-4 font-semibold text-sm
                     ">
                         ✓ Voucher "{appliedVoucher}" berhasil diterapkan
@@ -79,7 +91,7 @@ const Voucher = ({ onNext, onBack }) => {
                 <button
                     onClick={handleApplyVoucher}
                     className="
-                        w-full mt-6 py-3 rounded-full bg-green-400 text-white 
+                        w-full mt-6 py-3 rounded-full bg-green-400 text-white
                         font-bold text-lg shadow hover:bg-green-500 transition
                     "
                 >
@@ -92,7 +104,7 @@ const Voucher = ({ onNext, onBack }) => {
                 onClick={handleContinue}
                 className="
                     mt-10 px-10 py-3 rounded-full text-white font-bold text-lg
-                    bg-white/20 border border-white shadow 
+                    bg-white/20 border border-white shadow
                     hover:bg-white/30 transition
                 "
             >

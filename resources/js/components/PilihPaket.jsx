@@ -28,11 +28,23 @@ const PilihPaket = ({ onNext, onBack }) => {
 
     return (
         <div
+            style={{
+                    minHeight: '100vh',
+                    backgroundImage: 'url("/images/bg.jpg")',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    padding: '20px',
+                }}
             className="
-                min-h-screen 
+                min-h-screen
                 bg-[url('/images/bg.jpg')] bg-cover bg-center bg-no-repeat
-                flex flex-col items-center justify-center 
-                px-5 py-10 
+                flex flex-col items-center justify-center
+                px-5 py-10
                 relative
             "
         >
@@ -40,10 +52,10 @@ const PilihPaket = ({ onNext, onBack }) => {
             <button
                 onClick={onBack}
                 className="
-                    absolute top-5 left-5 
-                    px-5 py-2 
-                    rounded-full 
-                    bg-red-500 text-white 
+                    absolute top-5 left-5
+                    px-5 py-2
+                    rounded-full
+                    bg-red-500 text-white
                     shadow-md
                     transition-all duration-200
                     hover:bg-red-700
@@ -55,9 +67,9 @@ const PilihPaket = ({ onNext, onBack }) => {
             {/* Title */}
             <h1
                 className="
-                    font-bestian 
+                    font-bestian
                     text-white font-bold text-3xl md:text-4xl
-                    mb-12 
+                    mb-12
                     drop-shadow-[2px_2px_4px_rgba(0,0,0,0.3)]
                     text-center
                 "
@@ -68,9 +80,9 @@ const PilihPaket = ({ onNext, onBack }) => {
             {/* Grid Paket */}
             <div
                 className="
-                    grid 
+                    grid
                     grid-cols-1 md:grid-cols-2
-                    gap-8 
+                    gap-8
                     max-w-4xl w-full
                     mb-12
                 "
@@ -82,8 +94,8 @@ const PilihPaket = ({ onNext, onBack }) => {
                             key={pkg.id}
                             onClick={() => setSelectedPackage(pkg.id)}
                             className={`
-                                cursor-pointer 
-                                p-7 rounded-xl shadow-lg 
+                                cursor-pointer
+                                p-7 rounded-xl shadow-lg
                                 flex flex-col justify-between
                                 min-h-[260px]
                                 transition-all duration-300
@@ -107,8 +119,8 @@ const PilihPaket = ({ onNext, onBack }) => {
 
                             <div
                                 className="
-                                    flex justify-between items-center 
-                                    border-t border-amber-300/50 
+                                    flex justify-between items-center
+                                    border-t border-amber-300/50
                                     pt-4
                                 "
                             >
@@ -129,11 +141,11 @@ const PilihPaket = ({ onNext, onBack }) => {
             <button
                 onClick={handleContinue}
                 className="
-                    px-10 py-3 
-                    rounded-full 
-                    border-2 border-white 
-                    text-white 
-                    bg-white/20 
+                    px-10 py-3
+                    rounded-full
+                    border-2 border-white
+                    text-white
+                    bg-white/20
                     backdrop-blur-sm
                     text-lg font-bold
                     shadow-md

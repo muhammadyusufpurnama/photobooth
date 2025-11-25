@@ -10,7 +10,7 @@
         "@popperjs/core": "^2.11.6",
         "@tailwindcss/vite": "^4.1.17",
         "@vitejs/plugin-react": "^4.2.0",
-        "axios": "^1.11.0",
+        "axios": "^1.13.2",
         "bootstrap": "^5.2.3",
         "concurrently": "^9.0.1",
         "laravel-vite-plugin": "^2.0.1",
@@ -19,5 +19,14 @@
         "sass": "^1.56.1",
         "tailwindcss": "^4.1.17",
         "vite": "^7.0.7"
+    },
+    "dependencies": {
+        "cors": "^2.8.5",
+        "crypto": "^1.0.1",
+        "dotenv": "^17.2.3",
+        "express": "^5.1.0",
+        "gif.js": "^0.2.0",
+        "qrcode.react": "^4.2.0",
+        "uuid": "^13.0.0"
     }
 }
