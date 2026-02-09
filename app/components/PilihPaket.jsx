@@ -14,7 +14,7 @@ const PilihPaket = ({ onNext, onBack }) => {
             name: "Paket Photobooth", // Nama disesuaikan karena cuma satu
             description:
                 "unlimited retake, dengan hasil print dan soft file 4-6 foto, terdiri dari photo live, gif, foto frame dan foto mentahan dimana waktu take adalah 5 menit. Hasil print sebanyak 2 lembar.",
-            price: 25000, // Harga contoh (bisa Anda sesuaikan)
+            price: 1000, // Harga contoh (bisa Anda sesuaikan)
         },
     ];
 

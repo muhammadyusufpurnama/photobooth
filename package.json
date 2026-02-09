@@ -18,7 +18,9 @@
     "next": "16.1.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "react-qr-code": "^2.0.18"
+    "react-qr-code": "^2.0.18",
+    "react-rnd": "^10.5.2",
+    "sweetalert2": "^11.26.18"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
