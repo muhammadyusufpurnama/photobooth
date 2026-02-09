@@ -145,13 +145,6 @@ const PilihPembayaran = ({ onNext, onBack, bookingData }) => {
                     {loading ? 'Memproses...' : (!snapReady ? 'Memuat Sistem...' : 'BAYAR SEKARANG')}
                 </button>
 
-                <button 
-                    onClick={handleDevBypass}
-                    className="w-full py-2 bg-gray-700 text-white text-sm font-mono rounded-xl hover:bg-gray-800 transition border border-gray-500 border-dashed"
-                >
-                    🚧 DEV MODE: BYPASS PAYMENT 🚧
-                </button>
-
                 <p className="mt-4 text-xs text-gray-400">Powered by Midtrans Sandbox</p>
             </div>
         </div>

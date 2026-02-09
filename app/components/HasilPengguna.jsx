@@ -22,20 +22,37 @@ const HasilPengguna = ({ photos, templateId, filterStyle, onHome }) => {
     // --- 2. LOAD CONFIG ADMIN ---
     useEffect(() => {
         const loadConfig = () => {
-            const savedLayouts = localStorage.getItem('PHOTOBOOTH_LAYOUTS');
+            // 1. Ambil galeri utama
+            const savedGallery = localStorage.getItem('PHOTOBOOTH_GALLERY');
+            
+            // 2. Default fallback jika data tidak ditemukan
             let finalConfig = {
                 photoWidth: 140, photoHeight: 100,
                 marginTop: 80, marginLeft: 20,
                 gapX: 10, gapY: 10, borderRadius: 0
             };
 
-            if (savedLayouts) {
+            if (savedGallery) {
                 try {
-                    const allConfigs = JSON.parse(savedLayouts);
-                    const config = allConfigs[templateId] || allConfigs[String(templateId)];
-                    if (config) finalConfig = config;
-                } catch(e) { console.error(e); }
+                    const gallery = JSON.parse(savedGallery);
+                    // Cari template yang sedang digunakan berdasarkan templateId (index)
+                    const currentTemplate = gallery[templateId]; 
+                    
+                    if (currentTemplate && currentTemplate.slots.length > 0) {
+                        // Ambil slot pertama sebagai referensi ukuran (karena layoutConfig lama berbentuk objek tunggal)
+                        const referenceSlot = currentTemplate.slots[0];
+                        
+                        // Jika Anda ingin menggunakan sistem koordinat dinamis per slot, 
+                        // kita harus memodifikasi fungsi generateFrameFile (Lihat langkah 2)
+                        finalConfig = {
+                            ...finalConfig,
+                            photoWidth: referenceSlot.width,
+                            photoHeight: referenceSlot.height,
+                        };
+                    }
+                } catch(e) { console.error("Gagal sinkronisasi layout:", e); }
             }
+            
             setLayoutConfig(finalConfig);
             
             // Mulai proses jika belum dan ada minimal 1 foto
@@ -81,42 +98,60 @@ const HasilPengguna = ({ photos, templateId, filterStyle, onHome }) => {
         return new Promise(async (resolve) => {
             try {
                 const canvas = document.createElement('canvas');
-                canvas.width = 720; canvas.height = 1080;
+                canvas.width = 720; 
+                canvas.height = 1080;
                 const ctx = canvas.getContext('2d');
 
+                // Background putih dasar
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-                const bgImg = new Image(); bgImg.src = templateImg;
+                // 1. Ambil data template yang tepat dari Galeri
+                const savedGallery = JSON.parse(localStorage.getItem('PHOTOBOOTH_GALLERY') || '[]');
+                
+                // Gunakan .find jika templateId adalah ID unik, atau index jika templateId adalah urutan
+                const currentTemplate = savedGallery.find((t, index) => index === templateId || t.id === templateId);
+                const slotsConfig = currentTemplate ? currentTemplate.slots : [];
+
+                // 2. Load Template Image (Overlay)
+                const bgImg = new Image();
+                bgImg.src = currentTemplate ? currentTemplate.image : templateImg; 
                 await new Promise(r => bgImg.onload = r);
 
-                // Load foto secara paralel, abaikan yang null
-                const photoPromises = currentPhotos.map(async (p, i) => {
-                    if (!p) return null;
-                    const img = new Image();
-                    img.src = p.src;
-                    await new Promise(r => img.onload = r);
-                    return { img, index: i };
-                });
+                // 3. Gambar setiap foto berdasarkan slotnya
+                for (let i = 0; i < currentPhotos.length; i++) {
+                    const photoData = currentPhotos[i];
+                    const slot = slotsConfig[i]; 
 
-                const loadedResults = await Promise.all(photoPromises);
+                    if (photoData && slot) {
+                        const img = new Image();
+                        img.src = photoData.src;
+                        await new Promise(r => img.onload = r);
 
-                loadedResults.forEach((res) => {
-                    if (!res) return; // Skip slot kosong
-                    const { img, index } = res;
-                    const col = index % 2; 
-                    const row = Math.floor(index / 2);
-                    const w = cfg.photoWidth * SCALE_FACTOR;
-                    const h = cfg.photoHeight * SCALE_FACTOR;
-                    const x = (cfg.marginLeft * SCALE_FACTOR) + (col * (w + (cfg.gapX * SCALE_FACTOR)));
-                    const y = (cfg.marginTop * SCALE_FACTOR) + (row * (h + (cfg.gapY * SCALE_FACTOR)));
-                    
-                    ctx.drawImage(img, x, y, w, h);
-                });
+                        const x = slot.x * SCALE_FACTOR;
+                        const y = slot.y * SCALE_FACTOR;
+                        const w = slot.width * SCALE_FACTOR;
+                        const h = slot.height * SCALE_FACTOR;
 
+                        ctx.save();
+                        
+                        // --- TAMBAHKAN FILTER DISINI JIKA ADA ---
+                        // Contoh: if(filterStyle.filter.includes('grayscale')) ctx.filter = 'grayscale(100%)';
+                        
+                        // Gambar foto di bawah template
+                        ctx.drawImage(img, x, y, w, h);
+                        ctx.restore();
+                    }
+                }
+
+                // 4. Gambar Template Overlay di atas semua foto
                 ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
-                resolve(canvas.toDataURL('image/png'));
-            } catch (err) { console.error(err); resolve(null); }
+                
+                resolve(canvas.toDataURL('image/png', 1.0)); // 1.0 untuk kualitas maksimal
+            } catch (err) { 
+                console.error("Gagal generate frame:", err);
+                resolve(null); 
+            }
         });
     };
 
