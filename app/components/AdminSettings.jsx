@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Rnd } from 'react-rnd'; // Library Drag & Resize
+import Swal from 'sweetalert2';
 
 const AdminSettings = ({ onBack }) => {
     const [isMounted, setIsMounted] = useState(false);
@@ -101,38 +102,93 @@ const AdminSettings = ({ onBack }) => {
 
     // --- LOGIC BARU: SAVE KE GALERI ---
     const handleSave = () => {
-        if (!templatePreview) return alert("Pilih template dulu!");
-
-        // Simpan settingan hardware (Global)
-        localStorage.setItem('PHOTOBOOTH_CAMERA_ID', selectedCamera);
-        localStorage.setItem('PHOTOBOOTH_PRINTER', printerName);
-
-        // Ambil data galeri lama
-        const savedGallery = JSON.parse(localStorage.getItem('PHOTOBOOTH_GALLERY') || '[]');
-        
-        // Buat paket template baru
-        const newEntry = {
-            id: Date.now(),
-            image: templatePreview,
-            slots: photoSlots
-        };
-
-        // Tambahkan ke array dan batasi 5
-        let updatedGallery = [...savedGallery, newEntry];
-        if (updatedGallery.length > 5) {
-            alert("Limit 5 template tercapai. Template terlama akan dihapus.");
-            updatedGallery = updatedGallery.slice(1);
+        // Validasi awal jika template belum dipilih
+        if (!templatePreview) {
+            return Swal.fire({
+                title: 'Template Kosong!',
+                text: 'Silakan pilih atau upload template terlebih dahulu.',
+                icon: 'error',
+                confirmButtonColor: '#3b82f6', // blue-600
+            });
         }
 
-        localStorage.setItem('PHOTOBOOTH_GALLERY', JSON.stringify(updatedGallery));
-        setTemplateGallery(updatedGallery);
-        alert("✅ Template Berhasil Ditambahkan ke Galeri!");
+        // Tampilkan konfirmasi sebelum menyimpan
+        Swal.fire({
+            title: 'Simpan Konfigurasi?',
+            text: "Tata letak slot foto ini akan ditambahkan ke galeri (Maksimal 5).",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#10b981', // green-600
+            cancelButtonColor: '#6b7280',  // gray-500
+            confirmButtonText: 'Ya, Simpan!',
+            cancelButtonText: 'Batal',
+            background: '#1f292d',
+            color: '#ffffff'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // --- LOGIKA PENYIMPANAN ANDA ---
+                localStorage.setItem('PHOTOBOOTH_CAMERA_ID', selectedCamera);
+                localStorage.setItem('PHOTOBOOTH_PRINTER', printerName);
+
+                const savedGallery = JSON.parse(localStorage.getItem('PHOTOBOOTH_GALLERY') || '[]');
+                
+                const newEntry = {
+                    id: Date.now(),
+                    image: templatePreview,
+                    slots: photoSlots
+                };
+
+                let updatedGallery = [...savedGallery, newEntry];
+                
+                // Logika limit 5 template
+                if (updatedGallery.length > 5) {
+                    updatedGallery = updatedGallery.slice(1);
+                }
+
+                localStorage.setItem('PHOTOBOOTH_GALLERY', JSON.stringify(updatedGallery));
+                setTemplateGallery(updatedGallery);
+
+                // Tampilkan pesan sukses
+                Swal.fire({
+                    title: 'Berhasil!',
+                    text: 'Template baru telah ditambahkan ke galeri.',
+                    icon: 'success',
+                    timer: 2000,
+                    showConfirmButton: false,
+                    background: '#1f292d',
+                    color: '#ffffff'
+                });
+            }
+        });
     };
 
     const deleteTemplate = (id) => {
-        const updated = templateGallery.filter(t => t.id !== id);
-        localStorage.setItem('PHOTOBOOTH_GALLERY', JSON.stringify(updated));
-        setTemplateGallery(updated);
+        Swal.fire({
+            title: 'Hapus Template?',
+            text: "Template ini akan dihapus permanen dari galeri.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444', // red-600
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: 'Ya, Hapus!',
+            background: '#1f292d',
+            color: '#ffffff'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const updated = templateGallery.filter(t => t.id !== id);
+                localStorage.setItem('PHOTOBOOTH_GALLERY', JSON.stringify(updated));
+                setTemplateGallery(updated);
+                
+                Swal.fire({
+                    title: 'Terhapus!',
+                    icon: 'success',
+                    timer: 1500,
+                    showConfirmButton: false,
+                    background: '#1f292d',
+                    color: '#ffffff'
+                });
+            }
+        });
     };
 
     if (!isMounted) return null;

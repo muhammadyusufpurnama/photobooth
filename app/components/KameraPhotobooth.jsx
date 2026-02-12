@@ -148,7 +148,7 @@ const KameraPhotobooth = ({ onBack, onFinish }) => {
         let targetDeviceId = deviceId || localStorage.getItem('PHOTOBOOTH_CAMERA_ID');
         
         const constraints = {
-            video: { 
+            video: {
                 width: { ideal: 1280 }, 
                 height: { ideal: 720 }, 
                 deviceId: targetDeviceId ? { exact: targetDeviceId } : undefined, 
@@ -176,8 +176,6 @@ const KameraPhotobooth = ({ onBack, onFinish }) => {
         startCamera();
         return () => stopCamera();
     }, []);
-
-    const handleCameraChange = (e) => { setSelectedCameraId(e.target.value); startCamera(e.target.value); };
 
     // --- CAPTURE LOGIC ---
     const addPhotoToSlot = (imgDataUrl, videoBlobUrl) => {
@@ -262,6 +260,26 @@ const KameraPhotobooth = ({ onBack, onFinish }) => {
         }
     };
 
+    const handleExitConfirmation = () => {
+        Swal.fire({
+            title: 'Keluar dari Sesi Foto?',
+            text: "Semua foto yang sudah diambil akan terhapus.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444', // Merah
+            cancelButtonColor: '#6b7280',  // Abu-abu
+            confirmButtonText: 'Ya, Keluar',
+            cancelButtonText: 'Tetap di Sini',
+            background: '#1f2937',
+            color: '#ffffff'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                stopCamera(); // Pastikan kamera dimatikan sebelum keluar
+                onBack();     // Panggil fungsi kembali ke halaman sebelumnya
+            }
+        });
+    };
+
     return (
         <div className="h-screen w-full bg-gray-900 overflow-hidden relative text-white" 
              style={{
@@ -272,7 +290,10 @@ const KameraPhotobooth = ({ onBack, onFinish }) => {
             
             {/* HEADER */}
             <div className="absolute top-0 left-0 w-full h-12 flex items-center justify-between px-3 z-20 pointer-events-none">
-                <button onClick={onBack} className="pointer-events-auto px-4 py-1 rounded-full bg-red-500 text-white font-bold shadow-lg hover:bg-red-600 transition text-xs">
+                <button 
+                    onClick={handleExitConfirmation} // Ubah dari onBack menjadi handleExitConfirmation
+                    className="pointer-events-auto px-4 py-1 rounded-full bg-red-500 text-white font-bold shadow-lg hover:bg-red-600 transition text-xs"
+                >
                     Kembali
                 </button>
                 <div className={`pointer-events-auto px-4 py-1 rounded-full font-mono text-base font-bold shadow-md border-2 transition-colors duration-500 flex items-center gap-2 ${timeLeft <= 30 ? 'bg-red-600 border-red-400 animate-pulse' : 'bg-gray-900/90 border-blue-500 text-blue-100'}`}>
@@ -295,14 +316,6 @@ const KameraPhotobooth = ({ onBack, onFinish }) => {
                             <span className="absolute bottom-10 text-white animate-pulse">Merekam Live Photo...</span>
                         </div>
                     )}
-
-                    <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-2 px-4 z-30 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                        {availableCameras.length > 0 && (
-                            <select value={selectedCameraId} onChange={handleCameraChange} className="bg-gray-800/90 text-white p-1 rounded border border-gray-500 text-xs max-w-[100px] truncate" disabled={isCapturing}>
-                                {availableCameras.map((c, i) => <option key={c.deviceId} value={c.deviceId}>{c.label || `Kamera ${i+1}`}</option>)}
-                            </select>
-                        )}
-                    </div>
                 </div>
 
                 {/* 2. PANEL KANAN: LIVE PREVIEW & SELECTION */}

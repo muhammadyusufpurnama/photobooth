@@ -3,8 +3,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import gifshot from 'gifshot';
+import Swal from 'sweetalert2';
 
-const HasilPengguna = ({ photos, templateId, filterStyle, onHome }) => {
+const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
     // --- 1. STATE CONFIG & UI ---
     const [templateConfig, setTemplateConfig] = useState(null); 
     const [downloadLink, setDownloadLink] = useState(null);
@@ -290,6 +291,26 @@ const HasilPengguna = ({ photos, templateId, filterStyle, onHome }) => {
         return templateConfig ? templateConfig.image : defaultTemplateImg;
     }
 
+    const handleBackToHome = () => {
+        Swal.fire({
+            title: 'Kembali ke Menu Utama?',
+            text: "Pastikan Anda sudah menyimpan/mendownload foto atau menscan QR Code. Sesi ini akan berakhir dan data foto akan dihapus.",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#10b981', // Hijau (Warna sukses)
+            cancelButtonColor: '#6b7280',  // Abu-abu
+            confirmButtonText: 'Ya, Saya Sudah Simpan',
+            cancelButtonText: 'Belum, Kembali',
+            background: '#1f292d', // Menyesuaikan tema gelap Anda
+            color: '#ffffff'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Memanggil fungsi reset dari page.js untuk kembali ke Home
+                onHome(); 
+            }
+        });
+    };
+
     // --- RENDER UI ---
     return (
         <div className="min-h-screen w-full bg-gray-900 text-white flex flex-col items-center p-6 font-sans overflow-y-auto relative"
@@ -304,7 +325,12 @@ const HasilPengguna = ({ photos, templateId, filterStyle, onHome }) => {
                 {/* HEADER */}
                 <div className="w-full max-w-6xl flex justify-between items-center mb-8 border-b border-gray-500/50 pb-4">
                     <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-300 to-purple-300 drop-shadow-md">🎉 Hasil Photobooth Kamu</h1>
-                    <button onClick={onHome} className="bg-gray-800/80 hover:bg-gray-700/80 text-white px-6 py-2 rounded-full font-bold shadow-lg transition transform active:scale-95">Ke Halaman Utama</button>
+                    <button
+                        onClick={handleBackToHome}
+                        className="bg-gray-800/80 hover:bg-gray-700/80 text-white px-6 py-2 rounded-full font-bold shadow-lg transition transform active:scale-95"
+                    >
+                        Kembali ke halaman utama
+                    </button>
                 </div>
 
                 {/* INFO BOX & QR CODE */}
