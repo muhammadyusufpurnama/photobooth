@@ -367,7 +367,8 @@ const KameraPhotobooth = ({ onBack, onFinish }) => {
                                 className={`flex-1 py-2 rounded-lg font-bold transition text-xs ${currentSlot === 0 ? 'bg-gray-800 text-gray-600 cursor-not-allowed' : 'bg-gray-700 text-gray-300 hover:bg-red-600/80 hover:text-white'}`}>
                                 Ulang Foto
                             </button>
-                            <button onClick={() => onFinish(photos, 1)} disabled={currentSlot < photos.length} 
+                            <button onClick={() => onFinish(photos, templateGallery[activeTemplateIndex].id)} 
+                                disabled={currentSlot < photos.length} 
                                 className={`flex-1 py-2 rounded-lg font-bold transition text-xs ${currentSlot === photos.length ? 'bg-green-600 text-white hover:bg-green-500 animate-pulse' : 'bg-gray-800 text-gray-500'}`}>
                                 Selesai
                             </button>

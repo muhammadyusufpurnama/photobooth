@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { Rnd } from 'react-rnd'; // Library Drag & Resize
 
 const AdminSettings = ({ onBack }) => {
+    const [isMounted, setIsMounted] = useState(false);
+
     // --- 1. STATE DEVICES (Tetap Sama) ---
     const [cameras, setCameras] = useState([]);
     const [selectedCamera, setSelectedCamera] = useState('');
@@ -19,6 +21,8 @@ const AdminSettings = ({ onBack }) => {
 
     // --- INIT: LOAD DATA ---
     useEffect(() => {
+        setIsMounted(true);
+
         const getDevices = async () => {
             try {
                 await navigator.mediaDevices.getUserMedia({ video: true });
@@ -73,8 +77,9 @@ const AdminSettings = ({ onBack }) => {
             id: newId,
             x: 50,
             y: 50 + (photoSlots.length * 20),
-            width: 100,
-            height: 75,
+            // Rasio Landscape awal (Misal: lebar 120px, tinggi 80px untuk 3:2)
+            width: 120,
+            height: 80, 
         };
         setPhotoSlots([...photoSlots, newSlot]);
         setActiveSlotId(newId);
@@ -130,15 +135,22 @@ const AdminSettings = ({ onBack }) => {
         setTemplateGallery(updated);
     };
 
+    if (!isMounted) return null;
+
     return (
         <div className="min-h-screen bg-gray-900 text-white p-6 font-sans">
-            {/* HEADER (UI LAMA) */}
+
+            {/* HEADER */}
             <div className="max-w-7xl mx-auto flex justify-between items-center mb-8 border-b border-gray-700 pb-4">
                 <div>
                     <h1 className="text-3xl font-bold text-blue-400">⚙️ Admin Control Center</h1>
                     <p className="text-gray-400 text-sm">Atur perangkat dan tata letak template</p>
                 </div>
-                <button onClick={onBack} className="bg-gray-700 hover:bg-gray-600 px-6 py-2 rounded-full font-bold transition">
+                <button 
+                    onClick={onBack} 
+                    className="bg-gray-700 hover:bg-gray-600 px-6 py-2 rounded-full font-bold transition"
+                    suppressHydrationWarning={true} // <--- TAMBAHKAN INI
+                >
                     Kembali
                 </button>
             </div>
@@ -154,14 +166,14 @@ const AdminSettings = ({ onBack }) => {
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Kamera Input</label>
-                                <select value={selectedCamera} onChange={handleCameraChange} className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white">
+                                <select value={selectedCamera} onChange={handleCameraChange} className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white" suppressHydrationWarning>
                                     <option value="">-- Pilih Kamera --</option>
                                     {cameras.map(cam => <option key={cam.deviceId} value={cam.deviceId}>{cam.label || cam.deviceId}</option>)}
                                 </select>
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Printer Target</label>
-                                <input type="text" value={printerName} onChange={handlePrinterChange} className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white" />
+                                <input type="text" value={printerName} onChange={handlePrinterChange} className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white" suppressHydrationWarning/>
                             </div>
                         </div>
 
@@ -185,7 +197,7 @@ const AdminSettings = ({ onBack }) => {
                         </div>
                     </div>
 
-                    <button onClick={handleSave} className="w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold text-xl rounded-2xl shadow-xl transition transform hover:scale-105">
+                    <button onClick={handleSave} className="w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold text-xl rounded-2xl shadow-xl transition transform hover:scale-105" suppressHydrationWarning>
                         💾 SIMPAN KE GALERI
                     </button>
 
@@ -238,6 +250,10 @@ const AdminSettings = ({ onBack }) => {
                                 key={slot.id}
                                 size={{ width: slot.width, height: slot.height }}
                                 position={{ x: slot.x, y: slot.y }}
+                                
+                                // --- FITUR KUNCI: MEMPERTAHANKAN RASIO ---
+                                lockAspectRatio={true} 
+                                
                                 onDragStop={(e, d) => {
                                     updateSlot(slot.id, { x: d.x, y: d.y });
                                     setActiveSlotId(slot.id);
@@ -255,12 +271,22 @@ const AdminSettings = ({ onBack }) => {
                                 className={`border-2 flex items-center justify-center cursor-move group
                                     ${activeSlotId === slot.id ? 'border-blue-500 z-50 bg-blue-500/20' : 'border-gray-800/50 bg-gray-800/30 hover:border-blue-300'}
                                 `}
+                                // Memastikan handle resize hanya muncul di sudut (bulatan)
                                 resizeHandleStyles={{
-                                    topLeft: handleStyle, topRight: handleStyle,
-                                    bottomLeft: handleStyle, bottomRight: handleStyle
+                                    topLeft: handleStyle,
+                                    topRight: handleStyle,
+                                    bottomLeft: handleStyle,
+                                    bottomRight: handleStyle
+                                }}
+                                // Menonaktifkan resize dari sisi samping/atas/bawah agar hanya lewat sudut
+                                enableResizing={{
+                                    top: false, right: false, bottom: false, left: false,
+                                    topRight: true, bottomRight: true, bottomLeft: true, topLeft: true
                                 }}
                             >
-                                <span className="text-[10px] font-bold text-white drop-shadow-lg pointer-events-none">Foto {slot.id}</span>
+                                <span className="text-[10px] font-bold text-white drop-shadow-lg pointer-events-none">
+                                    Foto {slot.id}
+                                </span>
                             </Rnd>
                         ))}
                     </div>

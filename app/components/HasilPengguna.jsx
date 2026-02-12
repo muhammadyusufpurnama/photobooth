@@ -6,70 +6,69 @@ import gifshot from 'gifshot';
 
 const HasilPengguna = ({ photos, templateId, filterStyle, onHome }) => {
     // --- 1. STATE CONFIG & UI ---
-    const [layoutConfig, setLayoutConfig] = useState(null); 
+    const [templateConfig, setTemplateConfig] = useState(null); 
     const [downloadLink, setDownloadLink] = useState(null);
     const [isUploading, setIsUploading] = useState(false);
     const [loadingText, setLoadingText] = useState("Memuat konfigurasi...");
     const hasStartedProcess = useRef(false);
 
-    // Filter foto yang tidak null untuk keperluan internal (GIF Preview & Generator)
     const validPhotos = photos.filter(p => p !== null);
 
-    // Asset
-    const templateImg = templateId === 1 ? '/images/templates/template1.png' : '/images/templates/template2.png';
-    const SCALE_FACTOR = 720 / 320; 
+    // Default Asset (Jaga-jaga)
+    const defaultTemplateImg = '/images/templates/template1.png';
 
-    // --- 2. LOAD CONFIG ADMIN ---
+    // --- SETTING KUALITAS (Aman untuk Upload) ---
+    const SCALE_FACTOR = 1.5; // Resolusi Output (480x720)
+    const VIDEO_FPS = 24; 
+    const VIDEO_BITRATE = 800000; 
+
+    // --- 2. LOAD CONFIG DARI ADMIN (LOGIKA SMART FINDER) ---
     useEffect(() => {
         const loadConfig = () => {
-            // 1. Ambil galeri utama
             const savedGallery = localStorage.getItem('PHOTOBOOTH_GALLERY');
-            
-            // 2. Default fallback jika data tidak ditemukan
-            let finalConfig = {
-                photoWidth: 140, photoHeight: 100,
-                marginTop: 80, marginLeft: 20,
-                gapX: 10, gapY: 10, borderRadius: 0
-            };
+            let activeTemplate = null;
 
             if (savedGallery) {
                 try {
                     const gallery = JSON.parse(savedGallery);
-                    // Cari template yang sedang digunakan berdasarkan templateId (index)
-                    const currentTemplate = gallery[templateId]; 
                     
-                    if (currentTemplate && currentTemplate.slots.length > 0) {
-                        // Ambil slot pertama sebagai referensi ukuran (karena layoutConfig lama berbentuk objek tunggal)
-                        const referenceSlot = currentTemplate.slots[0];
-                        
-                        // Jika Anda ingin menggunakan sistem koordinat dinamis per slot, 
-                        // kita harus memodifikasi fungsi generateFrameFile (Lihat langkah 2)
-                        finalConfig = {
-                            ...finalConfig,
-                            photoWidth: referenceSlot.width,
-                            photoHeight: referenceSlot.height,
-                        };
+                    // Cari template yang ID-nya benar-benar cocok dengan templateId yang dikirim
+                    activeTemplate = gallery.find(t => String(t.id) === String(templateId));
+
+                    // Jika karena suatu alasan tidak ketemu, ambil yang pertama di galeri sebagai fallback
+                    if (!activeTemplate && gallery.length > 0) {
+                        activeTemplate = gallery[0];
                     }
-                } catch(e) { console.error("Gagal sinkronisasi layout:", e); }
+                } catch(e) { 
+                    console.error("Config Load Error:", e); 
+                }
             }
-            
-            setLayoutConfig(finalConfig);
-            
-            // Mulai proses jika belum dan ada minimal 1 foto
+
+            // Fallback terakhir jika galeri kosong
+            if (!activeTemplate) {
+                activeTemplate = {
+                    id: 'default',
+                    image: defaultTemplateImg,
+                    slots: [] 
+                };
+            }
+
+            setTemplateConfig(activeTemplate);
+
             if (!hasStartedProcess.current && validPhotos.length > 0) {
                 hasStartedProcess.current = true;
-                processAndUpload(finalConfig);
+                processAndUpload(activeTemplate); // Menggunakan template yang sudah fix ketemu
             }
         };
+
         const timer = setTimeout(loadConfig, 500);
         return () => clearTimeout(timer);
     }, [templateId, photos]);
 
-    // --- 3. LOGIC PREVIEW GIF ---
+    // --- 3. GIF LOGIC ---
     const [gifIndex, setGifIndex] = useState(0);
     useEffect(() => {
         if (validPhotos.length === 0) return;
-
         const interval = setInterval(() => {
             setGifIndex(prev => (prev + 1) % validPhotos.length);
         }, 500); 
@@ -78,112 +77,102 @@ const HasilPengguna = ({ photos, templateId, filterStyle, onHome }) => {
 
 
     // ==========================================
-    // BAGIAN GENERATOR (BACKEND PROCESS)
+    // GENERATORS
     // ==========================================
 
-    // A. GENERATOR GIF FILE
     const generateGifFile = (currentPhotos) => {
         return new Promise((resolve) => {
-            const images = currentPhotos.filter(p => p !== null).map(p => p.src);
+            const images = currentPhotos.map(p => p.src);
             if (images.length === 0) return resolve(null);
-
             gifshot.createGIF({
-                images: images, interval: 0.5, gifWidth: 400, gifHeight: 300, numFrames: 6
+                images: images, interval: 0.5, gifWidth: 300, gifHeight: 225, numFrames: 6
             }, (obj) => resolve(!obj.error ? obj.image : null));
         });
     };
 
-    // B. GENERATOR FRAME PNG
     const generateFrameFile = async (currentPhotos, cfg) => {
         return new Promise(async (resolve) => {
             try {
                 const canvas = document.createElement('canvas');
-                canvas.width = 720; 
-                canvas.height = 1080;
+                // Base Admin Canvas = 320x480. Kita kali Scale Factor.
+                canvas.width = 320 * SCALE_FACTOR; 
+                canvas.height = 480 * SCALE_FACTOR;
                 const ctx = canvas.getContext('2d');
 
-                // Background putih dasar
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-                // 1. Ambil data template yang tepat dari Galeri
-                const savedGallery = JSON.parse(localStorage.getItem('PHOTOBOOTH_GALLERY') || '[]');
-                
-                // Gunakan .find jika templateId adalah ID unik, atau index jika templateId adalah urutan
-                const currentTemplate = savedGallery.find((t, index) => index === templateId || t.id === templateId);
-                const slotsConfig = currentTemplate ? currentTemplate.slots : [];
-
-                // 2. Load Template Image (Overlay)
                 const bgImg = new Image();
-                bgImg.src = currentTemplate ? currentTemplate.image : templateImg; 
+                bgImg.src = cfg ? cfg.image : defaultTemplateImg;
                 await new Promise(r => bgImg.onload = r);
 
-                // 3. Gambar setiap foto berdasarkan slotnya
-                for (let i = 0; i < currentPhotos.length; i++) {
-                    const photoData = currentPhotos[i];
-                    const slot = slotsConfig[i]; 
+                const loadedPhotos = await Promise.all(currentPhotos.map(async (p) => {
+                    const img = new Image(); img.src = p.src;
+                    await new Promise(r => img.onload = r);
+                    return img;
+                }));
 
-                    if (photoData && slot) {
-                        const img = new Image();
-                        img.src = photoData.src;
-                        await new Promise(r => img.onload = r);
-
-                        const x = slot.x * SCALE_FACTOR;
-                        const y = slot.y * SCALE_FACTOR;
-                        const w = slot.width * SCALE_FACTOR;
-                        const h = slot.height * SCALE_FACTOR;
-
-                        ctx.save();
-                        
-                        // --- TAMBAHKAN FILTER DISINI JIKA ADA ---
-                        // Contoh: if(filterStyle.filter.includes('grayscale')) ctx.filter = 'grayscale(100%)';
-                        
-                        // Gambar foto di bawah template
-                        ctx.drawImage(img, x, y, w, h);
-                        ctx.restore();
-                    }
-                }
-
-                // 4. Gambar Template Overlay di atas semua foto
-                ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+                // Gunakan Data Slot dari Admin
+                const slots = cfg ? cfg.slots : [];
                 
-                resolve(canvas.toDataURL('image/png', 1.0)); // 1.0 untuk kualitas maksimal
-            } catch (err) { 
-                console.error("Gagal generate frame:", err);
-                resolve(null); 
-            }
+                loadedPhotos.forEach((img, i) => {
+                    let x, y, w, h;
+
+                    if (slots[i]) {
+                        // --- LOGIKA ADMIN (POSISI AKURAT) ---
+                        x = slots[i].x * SCALE_FACTOR;
+                        y = slots[i].y * SCALE_FACTOR;
+                        w = slots[i].width * SCALE_FACTOR;
+                        h = slots[i].height * SCALE_FACTOR;
+                    } else {
+                        // --- FALLBACK GRID (Jika data slot admin error/kosong) ---
+                        const col = i % 2; 
+                        const row = Math.floor(i / 2);
+                        w = 140 * SCALE_FACTOR;
+                        h = 100 * SCALE_FACTOR;
+                        x = (20 * SCALE_FACTOR) + (col * (w + (10 * SCALE_FACTOR)));
+                        y = (80 * SCALE_FACTOR) + (row * (h + (10 * SCALE_FACTOR)));
+                    }
+
+                    ctx.drawImage(img, x, y, w, h);
+                });
+
+                ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+                resolve(canvas.toDataURL('image/png', 0.9));
+            } catch (err) { console.error(err); resolve(null); }
         });
     };
 
-    // C. GENERATOR LIVE VIDEO MP4
     const generateLiveVideoFile = async (currentPhotos, cfg) => {
         return new Promise(async (resolve) => {
             try {
                 const canvas = document.createElement('canvas');
-                canvas.width = 720; canvas.height = 1080;
+                canvas.width = 320 * SCALE_FACTOR; 
+                canvas.height = 480 * SCALE_FACTOR;
                 const ctx = canvas.getContext('2d');
 
-                const bgImg = new Image(); bgImg.src = templateImg;
+                const bgImg = new Image(); 
+                bgImg.src = cfg ? cfg.image : defaultTemplateImg;
                 await new Promise(r => bgImg.onload = r);
+
+                const slots = cfg ? cfg.slots : [];
 
                 const videoElements = await Promise.all(currentPhotos.map(async (p, i) => {
                     if (!p || !p.video) return null;
                     const v = document.createElement('video');
                     v.src = p.video; 
-                    v.muted = true; 
-                    v.playsInline = true;
-                    v.preload = "auto";
-                    v.loop = true;
-
-                    await v.play().then(() => {
-                        v.pause();
-                        v.currentTime = 0;
-                    });
+                    v.muted = true; v.playsInline = true; v.preload = "auto"; v.loop = true;
+                    await v.play().then(() => { v.pause(); v.currentTime = 0; });
                     return { v, index: i };
                 }));
 
-                const stream = canvas.captureStream(30);
-                const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+                const stream = canvas.captureStream(VIDEO_FPS);
+                
+                const recorder = new MediaRecorder(stream, { 
+                    mimeType: 'video/webm;codecs=vp8',
+                    videoBitsPerSecond: VIDEO_BITRATE 
+                });
+                
                 const chunks = [];
                 recorder.ondataavailable = e => { if(e.data.size > 0) chunks.push(e.data); };
 
@@ -195,17 +184,21 @@ const HasilPengguna = ({ photos, templateId, filterStyle, onHome }) => {
                     videoElements.forEach((item) => {
                         if (!item) return;
                         const { v, index } = item;
-                        const col = index % 2; const row = Math.floor(index / 2);
-                        const w = cfg.photoWidth * SCALE_FACTOR;
-                        const h = cfg.photoHeight * SCALE_FACTOR;
-                        const x = (cfg.marginLeft * SCALE_FACTOR) + (col * (w + (cfg.gapX * SCALE_FACTOR)));
-                        const y = (cfg.marginTop * SCALE_FACTOR) + (row * (h + (cfg.gapY * SCALE_FACTOR)));
+                        
+                        let x, y, w, h;
+                        if (slots[index]) {
+                            x = slots[index].x * SCALE_FACTOR;
+                            y = slots[index].y * SCALE_FACTOR;
+                            w = slots[index].width * SCALE_FACTOR;
+                            h = slots[index].height * SCALE_FACTOR;
+                        } else {
+                            const col = index % 2; const row = Math.floor(index / 2);
+                            w = 140 * SCALE_FACTOR; h = 100 * SCALE_FACTOR;
+                            x = (20 * SCALE_FACTOR) + (col * (w + (10 * SCALE_FACTOR)));
+                            y = (80 * SCALE_FACTOR) + (row * (h + (10 * SCALE_FACTOR)));
+                        }
 
-                        ctx.save();
-                        ctx.translate(x + w, y);
-                        ctx.scale(-1, 1);
-                        ctx.drawImage(v, 0, 0, w, h);
-                        ctx.restore();
+                        ctx.drawImage(v, x, y, w, h);
                     });
 
                     ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
@@ -220,7 +213,7 @@ const HasilPengguna = ({ photos, templateId, filterStyle, onHome }) => {
                     cancelAnimationFrame(animationId);
                     recorder.stop();
                     videoElements.forEach(item => { if(item) { item.v.pause(); item.v.src = ''; } });
-                }, 5500); 
+                }, 6000); 
 
                 recorder.onstop = () => {
                     const blob = new Blob(chunks, { type: 'video/webm' });
@@ -228,7 +221,7 @@ const HasilPengguna = ({ photos, templateId, filterStyle, onHome }) => {
                     reader.onloadend = () => resolve(reader.result);
                     reader.readAsDataURL(blob);
                 };
-            } catch (e) { console.error(e); resolve(null); }
+            } catch (e) { resolve(null); }
         });
     };
 
@@ -239,15 +232,14 @@ const HasilPengguna = ({ photos, templateId, filterStyle, onHome }) => {
 
         try {
             const [liveVideo, gif, frame] = await Promise.all([
-                generateLiveVideoFile(photos, activeConfig),
-                generateGifFile(photos),
-                generateFrameFile(photos, activeConfig)
+                generateLiveVideoFile(validPhotos, activeConfig),
+                generateGifFile(validPhotos),
+                generateFrameFile(validPhotos, activeConfig)
             ]);
 
             setLoadingText("Mengupload ke Google Drive...");
             
             const payload = {
-                // Hanya kirim data yang tidak null ke drive
                 photos: validPhotos.map(p => ({ src: p.src })),
                 generated_gif: gif,
                 generated_frame: frame,
@@ -261,12 +253,42 @@ const HasilPengguna = ({ photos, templateId, filterStyle, onHome }) => {
                 setLoadingText("Selesai!");
             }
         } catch (error) {
-            console.error(error);
+            console.error("Upload Error:", error);
             setLoadingText("Gagal Upload.");
         } finally {
             setIsUploading(false);
         }
     };
+
+    // --- HELPER STYLE UNTUK PREVIEW HTML DI LAYAR ---
+    const getSlotStyle = (index) => {
+        // Cek apakah slot admin tersedia
+        if (!templateConfig || !templateConfig.slots[index]) {
+            // Jika tidak, tampilkan grid standar (Agar tidak blank/rusak)
+            const col = index % 2;
+            const row = Math.floor(index / 2);
+            return {
+                position: 'absolute',
+                width: '140px', height: '100px',
+                left: `${20 + (col * 150)}px`,
+                top: `${80 + (row * 110)}px`
+            };
+        }
+
+        // Jika ada, pakai koordinat Admin
+        const slot = templateConfig.slots[index];
+        return {
+            position: 'absolute',
+            left: `${slot.x}px`,
+            top: `${slot.y}px`,
+            width: `${slot.width}px`,
+            height: `${slot.height}px`,
+        };
+    };
+
+    const getBgImage = () => {
+        return templateConfig ? templateConfig.image : defaultTemplateImg;
+    }
 
     // --- RENDER UI ---
     return (
@@ -279,6 +301,7 @@ const HasilPengguna = ({ photos, templateId, filterStyle, onHome }) => {
             <div className="absolute inset-0 bg-black/40 pointer-events-none z-0"></div>
             
             <div className="w-full flex flex-col items-center z-10 relative">
+                {/* HEADER */}
                 <div className="w-full max-w-6xl flex justify-between items-center mb-8 border-b border-gray-500/50 pb-4">
                     <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-300 to-purple-300 drop-shadow-md">🎉 Hasil Photobooth Kamu</h1>
                     <button onClick={onHome} className="bg-gray-800/80 hover:bg-gray-700/80 text-white px-6 py-2 rounded-full font-bold shadow-lg transition transform active:scale-95">Ke Halaman Utama</button>
@@ -288,7 +311,7 @@ const HasilPengguna = ({ photos, templateId, filterStyle, onHome }) => {
                 <div className="w-full max-w-6xl bg-gray-900/60 backdrop-blur-md border border-white/20 rounded-2xl p-6 mb-12 flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl">
                     <div className="flex-1">
                         <h2 className="text-2xl font-bold mb-2 text-blue-200">✨ Download Softfile Lengkap</h2>
-                        <p className="text-gray-200 mb-4 font-medium">{isUploading ? loadingText : (downloadLink ? "Scan QR Code di samping, untuk mendapatkan file-file berikut:" : "Menunggu...")}</p>
+                        <p className="text-gray-200 mb-4 font-medium">{isUploading ? loadingText : (downloadLink ? "Scan QR Code di samping:" : "Menunggu...")}</p>
                         <ul className='ml-5 mb-5 list-disc text-gray-300'>
                             <li>Foto Frame High-Res</li>
                             <li>Foto Mentahan ({validPhotos.length} file)</li>
@@ -318,37 +341,34 @@ const HasilPengguna = ({ photos, templateId, filterStyle, onHome }) => {
                 </div>
 
                 {/* PREVIEW GRID */}
-                {layoutConfig && (
-                    <div className="w-full max-w-7xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 pb-10">
-                        {/* 1. FOTO FRAME */}
+                <div className="w-full max-w-7xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 pb-10">
+                    
+                    {/* 1. FOTO FRAME PREVIEW */}
+                    <div className="flex flex-col items-center gap-4">
                         <div className="bg-gray-800/60 p-3 rounded-xl border border-gray-500/50 relative group w-full flex justify-center shadow-xl h-fit">
                             <span className="absolute top-0 left-0 bg-blue-600 px-3 py-1 text-xs font-bold rounded-tl-xl rounded-br-xl text-white z-20 shadow-md">1. Foto Frame</span>
-                            <div className="relative overflow-hidden bg-white shadow-xl" style={{ width: '240px', height: '360px' }}>
+                            
+                            {/* Container 240x360 (Visual di layar) */}
+                            <div className="relative bg-white shadow-xl overflow-hidden" style={{ width: '240px', height: '360px' }}>
+                                {/* Scale 320x480 ke 240x360 (0.75x) */}
                                 <div className="absolute top-0 left-0 w-[320px] h-[480px] origin-top-left transform scale-[0.75]">
-                                    <div className="absolute grid grid-cols-2 grid-rows-3 z-0" 
-                                         style={{ 
-                                            top: `${layoutConfig.marginTop}px`, 
-                                            left: `${layoutConfig.marginLeft}px`, 
-                                            columnGap: `${layoutConfig.gapX}px`, 
-                                            rowGap: `${layoutConfig.gapY}px` 
-                                         }}>
-                                        {photos.map((p, i) => (
-                                            <div key={i} className="bg-gray-200 overflow-hidden" 
-                                                 style={{ 
-                                                    width: `${layoutConfig.photoWidth}px`, 
-                                                    height: `${layoutConfig.photoHeight}px`, 
-                                                    borderRadius: `${layoutConfig.borderRadius}px` 
-                                                 }}>
-                                                {p && <img src={p.src} className="w-full h-full object-cover" style={filterStyle} alt="" />}
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <img src={templateImg} className="absolute inset-0 w-full h-full z-10 pointer-events-none" alt="Frame" />
+                                    
+                                    {/* Render Foto sesuai Koordinat Admin (atau Fallback) */}
+                                    {validPhotos.map((p, i) => (
+                                        <div key={i} className="overflow-hidden bg-gray-200" style={getSlotStyle(i)}>
+                                            {p && <img src={p.src} className="w-full h-full object-cover" style={filterStyle} alt="" />}
+                                        </div>
+                                    ))}
+
+                                    {/* Overlay Template */}
+                                    <img src={getBgImage()} className="absolute inset-0 w-full h-full z-10 pointer-events-none" alt="Frame" />
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        {/* 2. FOTO MENTAHAN */}
+                    {/* 2. MENTAHAN */}
+                    <div className="flex flex-col items-center gap-4">
                         <div className="bg-gray-800/60 p-3 rounded-xl border border-gray-500/50 relative w-full h-[400px] flex items-center justify-center shadow-xl">
                             <span className="absolute top-0 left-0 bg-gray-600 px-3 py-1 text-xs font-bold rounded-tl-xl rounded-br-xl text-white z-20 shadow-md">2. Foto Mentahan</span>
                             <div className="relative w-[180px] h-[120px]">
@@ -358,40 +378,29 @@ const HasilPengguna = ({ photos, templateId, filterStyle, onHome }) => {
                                 ))}
                             </div>
                         </div>
+                    </div>
 
-                        {/* 3. LIVE FRAME */}
+                    {/* 3. LIVE FRAME PREVIEW */}
+                    <div className="flex flex-col items-center gap-4">
                         <div className="bg-gray-800/60 p-3 rounded-xl border border-gray-500/50 relative w-full flex justify-center shadow-xl h-fit">
                             <span className="absolute top-0 left-0 bg-red-600 px-3 py-1 text-xs font-bold rounded-tl-xl rounded-br-xl text-white z-20 animate-pulse shadow-md">3. Live Frame</span>
-                            <div className="relative overflow-hidden bg-black shadow-xl" style={{ width: '240px', height: '360px' }}>
+                            <div className="relative bg-black shadow-xl overflow-hidden" style={{ width: '240px', height: '360px' }}>
                                 <div className="absolute top-0 left-0 w-[320px] h-[480px] origin-top-left transform scale-[0.75]">
-                                    <div className="absolute grid grid-cols-2 grid-rows-3 z-0" 
-                                         style={{ 
-                                            top: `${layoutConfig.marginTop}px`, 
-                                            left: `${layoutConfig.marginLeft}px`, 
-                                            columnGap: `${layoutConfig.gapX}px`, 
-                                            rowGap: `${layoutConfig.gapY}px` 
-                                         }}>
-                                        {photos.map((p, i) => (
-                                            <div key={i} className="overflow-hidden bg-gray-900 relative" 
-                                                 style={{ 
-                                                    width: `${layoutConfig.photoWidth}px`, 
-                                                    height: `${layoutConfig.photoHeight}px`, 
-                                                    borderRadius: `${layoutConfig.borderRadius}px` 
-                                                 }}>
-                                                {p?.video ? (
-                                                    <video src={p.video} autoPlay loop muted playsInline className="w-full h-full object-cover transform scale-x-[-1]" style={filterStyle} />
-                                                ) : p ? (
-                                                    <img src={p.src} className="w-full h-full object-cover" style={filterStyle} alt="" />
-                                                ) : null}
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <img src={templateImg} className="absolute inset-0 w-full h-full z-10 pointer-events-none" alt="" />
+                                    {validPhotos.map((p, i) => (
+                                        <div key={i} className="overflow-hidden bg-gray-900" style={getSlotStyle(i)}>
+                                            {p?.video ? (
+                                                <video src={p.video} autoPlay loop muted playsInline className="w-full h-full object-cover transform scale-x-[-1]" style={filterStyle} />
+                                            ) : p ? <img src={p.src} className="w-full h-full object-cover" style={filterStyle} alt="" /> : null}
+                                        </div>
+                                    ))}
+                                    <img src={getBgImage()} className="absolute inset-0 w-full h-full z-10 pointer-events-none" alt="" />
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        {/* 4. GIF LOOP */}
+                    {/* 4. GIF LOOP */}
+                    <div className="flex flex-col items-center gap-4">
                         <div className="bg-gray-800/60 p-3 rounded-xl border border-gray-500/50 relative w-full flex items-center justify-center h-[400px] shadow-xl">
                             <span className="absolute top-0 left-0 bg-purple-600 px-3 py-1 text-xs font-bold rounded-tl-xl rounded-br-xl text-white z-20 shadow-md">4. GIF Loop</span>
                             <div className="relative w-[300px] aspect-[4/3] bg-black flex items-center justify-center overflow-hidden rounded-lg shadow-2xl border-4 border-white">
@@ -404,7 +413,8 @@ const HasilPengguna = ({ photos, templateId, filterStyle, onHome }) => {
                             </div>
                         </div>
                     </div>
-                )}
+
+                </div>
             </div>
         </div>
     );
