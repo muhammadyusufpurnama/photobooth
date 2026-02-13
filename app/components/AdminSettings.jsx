@@ -74,16 +74,12 @@ const AdminSettings = ({ onBack }) => {
 
     const addPhotoSlot = () => {
         const newId = photoSlots.length + 1;
-        const newSlot = {
+        setPhotoSlots([...photoSlots, {
             id: newId,
-            x: 50,
-            y: 50 + (photoSlots.length * 20),
-            // Rasio Landscape awal (Misal: lebar 120px, tinggi 80px untuk 3:2)
-            width: 120,
-            height: 80, 
-        };
-        setPhotoSlots([...photoSlots, newSlot]);
-        setActiveSlotId(newId);
+            x: 50, y: 50,
+            width: 150,   // Ukuran preview di admin
+            height: 100,  // Rasio 3:2 agar tidak penyet
+        }]);
     };
 
     const updateSlot = (id, data) => {

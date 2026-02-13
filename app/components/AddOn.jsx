@@ -7,7 +7,7 @@ const AddOn = ({ onNext, onBack, selectedPackage }) => {
     const [extraPrints, setExtraPrints] = useState(0);
 
     const hargapaket = selectedPackage?.price || 25000;
-    const pricePerPrint = 20000;
+    const pricePerPrint = 10000;
 
     const totalPrintCost = useMemo(
         () => (extraPrints * pricePerPrint) + hargapaket,

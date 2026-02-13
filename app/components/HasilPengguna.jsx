@@ -19,7 +19,7 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
     const defaultTemplateImg = '/images/templates/template1.png';
 
     // --- SETTING KUALITAS (Aman untuk Upload) ---
-    const SCALE_FACTOR = 1.5; // Resolusi Output (480x720)
+    const SCALE_FACTOR = 4.0; // Resolusi Output (480x720)
     const VIDEO_FPS = 24; 
     const VIDEO_BITRATE = 800000; 
 
@@ -99,6 +99,8 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
                 canvas.width = 320 * SCALE_FACTOR; 
                 canvas.height = 480 * SCALE_FACTOR;
                 const ctx = canvas.getContext('2d');
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
 
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);

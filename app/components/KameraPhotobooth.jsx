@@ -149,8 +149,8 @@ const KameraPhotobooth = ({ onBack, onFinish }) => {
         
         const constraints = {
             video: {
-                width: { ideal: 1280 }, 
-                height: { ideal: 720 }, 
+                width: { ideal: 1920 }, 
+                height: { ideal: 1080 }, 
                 deviceId: targetDeviceId ? { exact: targetDeviceId } : undefined, 
                 facingMode: targetDeviceId ? undefined : facingMode 
             },
