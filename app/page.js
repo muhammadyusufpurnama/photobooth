@@ -3,13 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 
-// 1. Perbaikan Import Dinamis (Gunakan jalur relatif yang benar)
 const AdminSettingsNoSSR = dynamic(
   () => import('./components/AdminSettings'),
   { ssr: false }
 );
 
-// Import komponen lainnya
 import Home from './components/Home';
 import Tutorial from './components/Tutorial';
 import PilihPaket from './components/PilihPaket';
@@ -36,12 +34,33 @@ export default function Page() {
     const [currentPage, setCurrentPage] = useState('home');
     const [bookingData, setBookingData] = useState({});
     const [finalPhotos, setFinalPhotos] = useState([]); 
-    const [finalTemplateId, setFinalTemplateId] = useState(null); // Mulai dengan null
+    const [finalTemplateId, setFinalTemplateId] = useState(null);
     const [selectedFilter, setSelectedFilter] = useState(filterOptions[0]);
 
+    // --- LOGIKA BARU: DETEKSI KEMBALI DARI DOKU ---
     useEffect(() => {
+        // Cek admin route
         if (window.location.pathname === '/admin') {
             setCurrentPage('admin');
+        }
+
+        // Cek status pembayaran dari localStorage
+        const isWaiting = localStorage.getItem('DOKU_IS_WAITING');
+        const savedBooking = localStorage.getItem('TEMP_BOOKING_DATA');
+
+        if (isWaiting === 'true') {
+            // Hapus flag agar tidak terjadi looping navigasi
+            localStorage.removeItem('DOKU_IS_WAITING');
+            localStorage.removeItem('DOKU_ONGOING_ORDER');
+            
+            // Pulihkan data booking jika ada yang disimpan
+            if (savedBooking) {
+                setBookingData(JSON.parse(savedBooking));
+                localStorage.removeItem('TEMP_BOOKING_DATA');
+            }
+
+            console.log("Welcome back! Resuming to Camera...");
+            setCurrentPage('kamera'); // Paksa navigasi ke sesi foto
         }
     }, []);
 
@@ -51,7 +70,7 @@ export default function Page() {
         if (currentPage === 'tutorial') navigateTo('home');
         else if (currentPage === 'pilih-paket') navigateTo('tutorial');
         else if (currentPage === 'add-on') navigateTo('pilih-paket');
-        else if (currentPage === 'pilih-pembayaran') navigateTo('add-on'); // Loncat voucher
+        else if (currentPage === 'pilih-pembayaran') navigateTo('add-on'); 
         else if (currentPage === 'kamera') navigateTo('pilih-pembayaran');
         else if (currentPage === 'cetak') navigateTo('kamera');
         else if (currentPage === 'hasil-pengguna') handleHomeReset();
@@ -63,17 +82,19 @@ export default function Page() {
 
     const handleAddOnNext = (addOnsData) => {
         setBookingData(prev => ({ ...prev, ...addOnsData }));
-        navigateTo('pilih-pembayaran'); // Alur tanpa voucher
+        navigateTo('pilih-pembayaran');
     };
 
-    const handlePilihPembayaranNext = (paymentStatus) => {
-        setBookingData(prev => ({ ...prev, paymentStatus }));
+    // Modifikasi handleNext dari Pembayaran
+    const handlePilihPembayaranNext = (status) => {
+        // Jika statusnya 'DEV_BYPASS' atau 'LUNAS_DOKU'
+        setBookingData(prev => ({ ...prev, paymentStatus: status }));
         navigateTo('kamera');
     };
 
     const handleCameraFinish = (photos, templateId) => {
         setFinalPhotos(photos);
-        setFinalTemplateId(templateId); // Menyimpan ID unik dari Kamera
+        setFinalTemplateId(templateId);
         setSelectedFilter(filterOptions[0]);
         navigateTo('cetak');
     };
@@ -82,6 +103,7 @@ export default function Page() {
         setBookingData({});
         setFinalPhotos([]);
         setFinalTemplateId(null);
+        localStorage.clear(); // Bersihkan sisa-sisa tracking pembayaran
         navigateTo('home');
     };
 
@@ -92,7 +114,6 @@ export default function Page() {
             if (savedGallery) {
                 try {
                     const gallery = JSON.parse(savedGallery);
-                    // Mencari template yang benar-benar dipilih berdasarkan ID unik
                     selectedTemplateData = gallery.find(t => String(t.id) === String(finalTemplateId));
                 } catch (e) { console.error(e); }
             }
@@ -134,6 +155,7 @@ export default function Page() {
             case 'add-on':
                 return <AddOn onNext={handleAddOnNext} onBack={handleBack} selectedPackage={bookingData.package} />;
             case 'pilih-pembayaran':
+                // Sekarang menggunakan komponen DOKU
                 return <PilihPembayaran onNext={handlePilihPembayaranNext} onBack={handleBack} bookingData={bookingData} />;
             case 'kamera':
                 return <KameraPhotobooth onBack={handleBack} onFinish={handleCameraFinish} />;

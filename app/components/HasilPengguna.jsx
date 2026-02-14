@@ -161,9 +161,11 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
         return new Promise(async (resolve) => {
             try {
                 const canvas = document.createElement('canvas');
-                canvas.width = 320 * SCALE_FACTOR; 
-                canvas.height = 480 * SCALE_FACTOR;
-                const ctx = canvas.getContext('2d');
+                // Tetap gunakan SCALE_FACTOR atau turunkan sedikit ke 2.0 jika ingin file lebih kecil
+                const VIDEO_SCALE = 2.0; 
+                canvas.width = 320 * VIDEO_SCALE; 
+                canvas.height = 480 * VIDEO_SCALE;
+                const ctx = canvas.getContext('2d', { alpha: false });
 
                 const bgImg = new Image(); 
                 bgImg.src = cfg ? cfg.image : defaultTemplateImg;
@@ -171,12 +173,18 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
 
                 const slots = cfg ? cfg.slots : [];
 
+                // 1. Persiapkan Video dengan Load yang Lebih Pasti
                 const videoElements = await Promise.all(currentPhotos.map(async (p, i) => {
                     if (!p || !p.video) return null;
                     const v = document.createElement('video');
                     v.src = p.video; 
-                    v.muted = true; v.playsInline = true; v.preload = "auto"; v.loop = true;
-                    await v.play().then(() => { v.pause(); v.currentTime = 0; });
+                    v.muted = true; v.loop = true; v.playsInline = true;
+                    v.crossOrigin = "anonymous";
+                    
+                    await new Promise((r) => {
+                        v.oncanplaythrough = r;
+                        v.load();
+                    });
                     return { v, index: i };
                 }));
 
@@ -199,18 +207,17 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
                         const { v, index } = item;
                         let x, y, w, h;
                         if (slots[index]) {
-                            x = slots[index].x * SCALE_FACTOR; y = slots[index].y * SCALE_FACTOR;
-                            w = slots[index].width * SCALE_FACTOR; h = slots[index].height * SCALE_FACTOR;
+                            x = slots[index].x * VIDEO_SCALE; y = slots[index].y * VIDEO_SCALE;
+                            w = slots[index].width * VIDEO_SCALE; h = slots[index].height * VIDEO_SCALE;
                         } else {
                             const col = index % 2; const row = Math.floor(index / 2);
-                            w = 140 * SCALE_FACTOR; h = 100 * SCALE_FACTOR;
-                            x = (20 * SCALE_FACTOR) + (col * (w + (10 * SCALE_FACTOR)));
-                            y = (80 * SCALE_FACTOR) + (row * (h + (10 * SCALE_FACTOR)));
+                            w = 140 * VIDEO_SCALE; h = 100 * VIDEO_SCALE;
+                            x = (20 * VIDEO_SCALE) + (col * (w + (10 * VIDEO_SCALE)));
+                            y = (80 * VIDEO_SCALE) + (row * (h + (10 * VIDEO_SCALE)));
                         }
 
-                        // --- APPLY FILTER KE VIDEO (Realtime) ---
                         ctx.save();
-                        ctx.filter = activeFilter; 
+                        if (activeFilter !== 'none') ctx.filter = activeFilter; 
                         ctx.drawImage(v, x, y, w, h);
                         ctx.restore();
                     });
@@ -219,26 +226,28 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
                     animationId = requestAnimationFrame(draw);
                 };
 
-                // FIX DURASI VIDEO: Start tanpa timeslice agar jadi satu blob utuh
-                recorder.start(); 
-                videoElements.forEach(item => item?.v.play());
-                draw();
+                // --- STRATEGI ANTI-LAG ---
+                // A. Jalankan visual loop dulu agar CPU terbiasa dengan beban filter
+                draw(); 
 
-                // Rekam selama 5 Detik
+                // B. Beri jeda 1 detik agar proses rendering stabil sebelum tombol record ditekan
                 setTimeout(() => {
-                    cancelAnimationFrame(animationId);
-                    if(recorder.state !== 'inactive') recorder.stop();
-                    videoElements.forEach(item => { if(item) { item.v.pause(); item.v.src = ''; } });
-                }, 5000); 
+                    // C. Mulai putar video dan rekam
+                    videoElements.forEach(item => item?.v.play());
+                    recorder.start(100); 
+
+                    // D. Durasi total 5.5 detik untuk memastikan hasil bersih 5 detik
+                    setTimeout(() => {
+                        if(recorder.state !== 'inactive') recorder.stop();
+                        cancelAnimationFrame(animationId);
+                        videoElements.forEach(item => { if(item) { item.v.pause(); item.v.src = ""; } });
+                    }, 5500);
+                }, 1000); 
 
                 recorder.onstop = () => {
                     const blob = new Blob(chunks, { type: 'video/webm' });
                     const reader = new FileReader();
-                    reader.onloadend = () => {
-                        // Debugging Size
-                        console.log("Video Size:", (reader.result.length/1024/1024).toFixed(2) + " MB");
-                        resolve(reader.result);
-                    };
+                    reader.onloadend = () => resolve(reader.result);
                     reader.readAsDataURL(blob);
                 };
             } catch (e) { resolve(null); }

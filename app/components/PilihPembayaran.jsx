@@ -1,154 +1,134 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
 
 const PilihPembayaran = ({ onNext, onBack, bookingData }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [snapReady, setSnapReady] = useState(false);
 
-    // Ambil totalAmount
+    // Mengambil total harga dari data booking
     const totalAmount = bookingData?.grandTotal || 25000;
 
-    // 1. Load Script Midtrans Snap
-    useEffect(() => {
-        const loader = () => {
-            if (window.snap) {
-                setSnapReady(true);
-            } else {
-                const script = document.createElement('script');
-                script.src = "https://app.sandbox.midtrans.com/snap/snap.js";
-                
-                // MODIFIKASI 1: Gunakan Env Variable agar aman & sinkron dengan .env
-                const clientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY; 
-                
-                script.setAttribute('data-client-key', clientKey);
-                script.async = true;
-                script.onload = () => setSnapReady(true);
-                document.head.appendChild(script);
-            }
-        };
-        loader();
-    }, []);
-
-
     const handlePayment = async () => {
-        if (!snapReady) {
-            alert("Sistem pembayaran sedang disiapkan, mohon tunggu sebentar...");
-            return;
-        }
-
         setLoading(true);
         setError(null);
 
         try {
-            const response = await axios.post('/api/midtrans/token', {
-                amount: totalAmount
+            const response = await axios.post('/api/doku/token', {
+                amount: totalAmount,
+                orderId: `PHOTO-${Date.now()}`,
+                email: "guest@photobooth.com"
             });
 
-            const snapToken = response.data.token || response.data.snap_token;
+            const { payment_url, order_id } = response.data;
 
-            if (snapToken && window.snap) {
-                window.snap.pay(snapToken, {
-                    // 1. JIKA SUKSES BENERAN (Pakai Trik BCA tadi)
-                    onSuccess: (result) => {
-                        console.log("Payment Success", result);
-                        onNext('LUNAS');
-                    },
-                    
-                    // 2. JIKA PENDING (Dianggap Sukses juga buat dev)
-                    onPending: (result) => {
-                        console.log("Payment Pending", result);
-                        // UBAH DISINI: Langsung bypass aja kalau pending (biar ga nunggu)
-                        if (confirm("DEV MODE: Transaksi Pending. Anggap Lunas?")) {
-                             onNext('LUNAS_VIA_PENDING');
-                        }
-                    },
-
-                    // 3. JIKA ERROR
-                    onError: (result) => {
-                        console.error("Payment Error", result);
-                        // Jangan langsung alert, cek dulu statusnya
-                        setLoading(false);
-                    },
-
-                    // 4. JIKA DI-CLOSE (Klik tanda Silang X)
-                    onClose: () => {
-                        console.log("Popup closed via X button");
-                        
-                        // Fitur BYPASS Paksa
-                        // Gunakan confirm agar user sadar ini mode dev
-                        const isBypass = confirm("DEV MODE: Pembayaran belum selesai. Apakah Anda ingin LEWATI pembayaran dan lanjut foto?");
-                        
-                        if (isBypass) {
-                            onNext('DEV_BYPASS');
-                        } else {
-                            setLoading(false);
-                        }
-                    }
-                });
+            if (payment_url) {
+                // --- BAGIAN KRUSIAL ---
+                // 1. Tandai bahwa kita sedang menunggu pembayaran
+                localStorage.setItem('DOKU_IS_WAITING', 'true');
+                localStorage.setItem('DOKU_ONGOING_ORDER', order_id);
+                
+                // 2. Simpan bookingData agar tidak hilang saat refresh
+                localStorage.setItem('TEMP_BOOKING_DATA', JSON.stringify(bookingData));
+                
+                // 3. Redirect ke DOKU
+                window.location.href = payment_url;
             } else {
-                throw new Error("Gagal mendapatkan token.");
+                throw new Error("Gagal mendapatkan URL pembayaran.");
             }
 
         } catch (err) {
-            console.error("Payment Error:", err);
-            const errMsg = err.response?.data?.message || err.message || "Gagal menghubungi server.";
-            setError(errMsg);
+            console.error("DOKU Error:", err);
+            setError(err.message);
             setLoading(false);
         }
     };
 
+    // Fitur untuk developer melewati pembayaran saat testing di localhost
     const handleDevBypass = () => {
-        if (confirm("DEV MODE: Lewati pembayaran dan lanjut ke foto?")) {
-            onNext('DEV_BYPASS');
+        if (confirm("DEV MODE: Apakah Anda ingin melewati pembayaran dan langsung ke sesi foto?")) {
+            onNext('LUNAS_DEV_BYPASS');
         }
     };
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center relative"
+        <div className="min-h-screen flex flex-col items-center justify-center relative p-4"
              style={{ backgroundImage: 'url("/images/Navy Black and White Grunge Cat Desktop Wallpaper (2) (1).jpg")', backgroundSize: 'cover' }}>
 
-            <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
+            {/* Overlay Gelap */}
+            <div className="absolute inset-0 bg-black/50 pointer-events-none"></div>
 
-            <button onClick={onBack} className="absolute top-5 left-5 px-5 py-2 rounded-full bg-red-500 text-white font-bold shadow-lg z-10">
-                Kembali
+            {/* Tombol Kembali */}
+            <button 
+                onClick={onBack} 
+                className="absolute top-5 left-5 px-6 py-2 rounded-full bg-white/10 hover:bg-white/20 text-white font-bold backdrop-blur-md border border-white/30 transition z-20"
+            >
+                ← Kembali
             </button>
 
-            <div className="bg-white/90 backdrop-blur-md p-8 rounded-3xl max-w-md w-full text-center shadow-2xl border-2 border-amber-500 z-10 relative">
-                <h1 className="text-3xl font-extrabold text-amber-700 mb-2">Konfirmasi</h1>
-                <p className="text-gray-500 mb-6">Selesaikan pembayaran untuk mulai berfoto</p>
+            {/* Tombol Rahasia Dev Bypass */}
+            <button 
+                onClick={handleDevBypass} 
+                className="absolute bottom-5 right-5 text-[10px] text-white/20 hover:text-white transition z-20"
+            >
+                🛠 Bypass
+            </button>
 
-                <div className="bg-amber-100 p-6 rounded-2xl mb-8 border-2 border-amber-200">
-                    <span className="text-gray-600 block text-sm uppercase tracking-widest mb-1">Total Tagihan</span>
-                    <span className="text-4xl font-black text-amber-800">
-                        Rp {totalAmount.toLocaleString('id-ID')}
-                    </span>
-                </div>
-
-                {error && (
-                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 relative">
-                        <span className="block sm:inline">{error}</span>
+            {/* Kartu Pembayaran */}
+            <div className="bg-white rounded-[2rem] max-w-md w-full text-center shadow-2xl overflow-hidden z-10 relative border border-white/20">
+                <div className="p-8">
+                    <div className="flex justify-center mb-6">
+                        <img 
+                            src="https://cdn.doku.com/doku-com-assets/logo/doku_logo.png" 
+                            alt="DOKU Payment" 
+                            className="h-8 object-contain"
+                        />
                     </div>
-                )}
 
-                <button
-                    onClick={handlePayment}
-                    disabled={loading || !snapReady}
-                    className={`w-full py-4 font-bold text-xl rounded-2xl transition-all transform active:scale-95 shadow-xl 
-                        ${(loading || !snapReady) 
-                            ? 'bg-gray-400 cursor-not-allowed text-gray-200' 
-                            : 'bg-amber-600 hover:bg-amber-700 text-white'
-                        }`}
-                >
-                    {loading ? 'Memproses...' : (!snapReady ? 'Memuat Sistem...' : 'BAYAR SEKARANG')}
-                </button>
+                    <h1 className="text-2xl font-black text-gray-800 mb-1">Konfirmasi Pembayaran</h1>
+                    <p className="text-gray-500 text-sm mb-8">Pilih metode pembayaran favoritmu di halaman berikutnya</p>
 
-                <p className="mt-4 text-xs text-gray-400">Powered by Midtrans Sandbox</p>
+                    <div className="bg-slate-50 p-6 rounded-2xl mb-8 border border-slate-100">
+                        <span className="text-slate-400 block text-xs uppercase tracking-[0.2em] mb-2 font-bold">Total Pembayaran</span>
+                        <span className="text-4xl font-black text-slate-800">
+                            Rp {totalAmount.toLocaleString('id-ID')}
+                        </span>
+                    </div>
+
+                    {error && (
+                        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl mb-6 text-sm font-medium">
+                            ⚠️ {error}
+                        </div>
+                    )}
+
+                    <button
+                        onClick={handlePayment}
+                        disabled={loading}
+                        className={`w-full py-4 font-black text-lg rounded-2xl transition-all transform active:scale-95 shadow-lg flex items-center justify-center gap-3
+                            ${loading 
+                                ? 'bg-slate-300 cursor-not-allowed text-slate-500' 
+                                : 'bg-red-600 hover:bg-red-700 text-white'
+                            }`}
+                    >
+                        {loading ? (
+                            <>
+                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                <span>Menyiapkan Halaman...</span>
+                            </>
+                        ) : (
+                            'LANJUT KE PEMBAYARAN'
+                        )}
+                    </button>
+
+                    <p className="mt-6 text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                        Securely Processed by DOKU
+                    </p>
+                </div>
             </div>
         </div>
     );
 };
 
+// PENTING: Jangan hapus baris export default ini
 export default PilihPembayaran;

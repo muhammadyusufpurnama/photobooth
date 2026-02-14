@@ -7,22 +7,34 @@ export async function POST(request) {
     try {
         const { amount } = await request.json();
 
-        // 1. Validasi Server Key (Pastikan ada di .env.local)
-        if (!process.env.MIDTRANS_SERVER_KEY) {
-            return NextResponse.json({ message: "Server Key belum diset" }, { status: 500 });
+        // --- 1. LOGIKA PEMILIHAN ENVIRONMENT (OPSI B) ---
+        
+        // Cek apakah mode Production aktif? (Konversi string 'true' ke boolean)
+        const isProduction = process.env.MIDTRANS_IS_PRODUCTION === 'false';
+
+        // Pilih Server Key yang sesuai
+        const currentServerKey = isProduction 
+            ? process.env.MIDTRANS_SERVER_KEY_PROD 
+            : process.env.MIDTRANS_SERVER_KEY_SANDBOX;
+
+        // Validasi: Pastikan key yang dipilih benar-benar ada
+        if (!currentServerKey) {
+            return NextResponse.json({ 
+                message: `Server Key untuk mode ${isProduction ? 'PRODUCTION' : 'SANDBOX'} belum diset di file .env` 
+            }, { status: 500 });
         }
 
-        // 2. Inisialisasi Midtrans Snap
+        // --- 2. INISIALISASI MIDTRANS SNAP ---
         let snap = new Midtrans.Snap({
-            isProduction: false,
-            serverKey: process.env.MIDTRANS_SERVER_KEY,
+            isProduction: isProduction, // Dinamis: true atau false
+            serverKey: currentServerKey, // Dinamis: Kunci Prod atau Sandbox
         });
 
-        // 3. Buat Order ID Unik
-        // Mirip dengan 'PHOTO-' . uniqid() di PHP
+        // --- 3. BUAT ORDER ID UNIK ---
+        // Format: 'PHOTO-TIMESTAMP-RANDOM'
         const orderId = 'PHOTO-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
 
-        // 4. Siapkan Parameter JSON Midtrans
+        // --- 4. SIAPKAN PARAMETER TRANSAKSI ---
         let parameter = {
             transaction_details: {
                 order_id: orderId,
@@ -31,19 +43,24 @@ export async function POST(request) {
             customer_details: {
                 first_name: "Guest",
                 last_name: "Photobooth",
-                email: "guest@photobooth.com",
+                email: "guest@photobooth.com", // Bisa diganti input user jika ada
             },
-            // credit_card: { secure: true }, // Aktifkan jika butuh CC
+            // Opsional: Pengaturan Durasi Expired Transaksi (misal 15 menit)
+            expiry: {
+                unit: "minutes",
+                duration: 15
+            }
         };
 
-        // 5. Minta Token ke Server Midtrans
+        // --- 5. MINTA TOKEN KE SERVER MIDTRANS ---
         const transaction = await snap.createTransaction(parameter);
         const token = transaction.token;
 
-        // 6. Kirim Balik Token ke Frontend
+        // --- 6. KIRIM BALIK KE FRONTEND ---
         return NextResponse.json({ 
             token: token,
-            order_id: orderId 
+            order_id: orderId,
+            mode: isProduction ? 'Production' : 'Sandbox' // Info tambahan untuk debug di console browser
         });
 
     } catch (error) {
