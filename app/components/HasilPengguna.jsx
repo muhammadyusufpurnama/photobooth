@@ -99,8 +99,8 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
                 images: filteredImages, 
                 interval: 0.5, 
                 // UBAH KE 16:9 (480x270)
-                gifWidth: 1920, 
-                gifHeight: 1080, 
+                gifWidth: 960, 
+                gifHeight: 540, 
                 numFrames: 6
             }, (obj) => resolve(!obj.error ? obj.image : null));
         });
