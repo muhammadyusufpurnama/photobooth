@@ -108,7 +108,9 @@ const KameraPhotobooth = ({ onBack, onFinish }) => {
     // Timer Mundur
     useEffect(() => {
         if (timeLeft <= 0) { 
-            onFinish(photos, 1); 
+            // Safety check agar tidak crash jika gallery kosong saat waktu habis
+            const currentId = templateGallery[activeTemplateIndex]?.id || 1;
+            onFinish(photos, currentId); 
             return; 
         }
 
@@ -132,7 +134,7 @@ const KameraPhotobooth = ({ onBack, onFinish }) => {
 
         const timerInterval = setInterval(() => setTimeLeft((p) => p - 1), 1000);
         return () => clearInterval(timerInterval);
-    }, [timeLeft, onFinish, photos, hasWarnedTime]);
+    }, [timeLeft, onFinish, photos, hasWarnedTime, templateGallery, activeTemplateIndex]);
 
     // --- KAMERA LOGIC ---
     const stopCamera = () => {
@@ -192,13 +194,21 @@ const KameraPhotobooth = ({ onBack, onFinish }) => {
         if (!videoRef.current || !canvasRef.current) return null;
         const video = videoRef.current;
         const canvas = canvasRef.current;
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        
+        // --- PRE-SCALE CAPTURE (Opsional, tapi bagus untuk performa) ---
+        // Kita tangkap dengan resolusi setengah 1080p agar ringan saat preview & upload
+        // 960x540 cukup tajam untuk slot kecil
+        const captureW = 1920;
+        const captureH = 1080;
+
+        canvas.width = captureW;
+        canvas.height = captureH;
         const ctx = canvas.getContext('2d');
         
-        ctx.translate(canvas.width, 0);
+        ctx.translate(captureW, 0);
         ctx.scale(-1, 1);
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        ctx.drawImage(video, 0, 0, captureW, captureH);
+        
         return canvas.toDataURL('image/jpeg', 0.9);
     }, []);
 
@@ -339,7 +349,9 @@ const KameraPhotobooth = ({ onBack, onFinish }) => {
 
                     <div className="flex-1 flex flex-row gap-1 items-center justify-center bg-white/5 rounded-lg border border-white/10 p-1 overflow-hidden relative">
                         <div className="flex-1 h-full flex items-center justify-center">
-                            <div className="relative bg-transparent shadow-xl ring-2 ring-gray-800 rounded-sm transform scale-[0.82] origin-center"
+                            
+                            {/* --- PERBAIKAN: TAMBAHKAN overflow-hidden --- */}
+                            <div className="relative bg-transparent shadow-xl ring-2 ring-gray-800 rounded-sm transform scale-[0.82] origin-center overflow-hidden"
                                  style={{ width: '320px', height: '480px', flexShrink: 0 }}>
                                 
                                 {slots.map((slot, index) => {
@@ -380,7 +392,12 @@ const KameraPhotobooth = ({ onBack, onFinish }) => {
                                 className={`flex-1 py-2 rounded-lg font-bold transition text-xs ${currentSlot === 0 ? 'bg-gray-800 text-gray-600 cursor-not-allowed' : 'bg-gray-700 text-gray-300 hover:bg-red-600/80 hover:text-white'}`}>
                                 Ulang Foto
                             </button>
-                            <button onClick={() => onFinish(photos, templateGallery[activeTemplateIndex].id)} 
+                            <button 
+                                onClick={() => {
+                                    // Safety: Gunakan ID template aktif, atau fallback jika gallery kosong/error
+                                    const activeId = templateGallery[activeTemplateIndex] ? templateGallery[activeTemplateIndex].id : 1;
+                                    onFinish(photos, activeId);
+                                }} 
                                 disabled={currentSlot < photos.length} 
                                 className={`flex-1 py-2 rounded-lg font-bold transition text-xs ${currentSlot === photos.length ? 'bg-green-600 text-white hover:bg-green-500 animate-pulse' : 'bg-gray-800 text-gray-500'}`}>
                                 Selesai

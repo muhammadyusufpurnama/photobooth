@@ -14,18 +14,17 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
     const hasStartedProcess = useRef(false);
 
     const validPhotos = photos.filter(p => p !== null);
-
-    // Asset Default
     const defaultTemplateImg = '/images/templates/template1.png';
 
-    // --- SETTING KUALITAS (DITURUNKAN AGAR TIDAK ERROR 413 DI VERCEL) ---
-    // Scale 1.5 = Resolusi output 480x720 (Cukup jelas di HP, File Ringan)
-    // Jangan pakai 4.0 (terlalu besar untuk Vercel Free Tier)
-    const SCALE_FACTOR = 1.5; 
-    const VIDEO_FPS = 15; // 15 FPS Cukup untuk Live Photo
-    const VIDEO_BITRATE = 600000; // 600 kbps (Sangat aman untuk upload)
+    // --- SETTING KUALITAS (Optimized) ---
+    const SCALE_FACTOR = 4.0; // Output 640x960 (Cukup tajam, File Ringan)
+    const VIDEO_FPS = 30; 
+    const VIDEO_BITRATE = 800000; 
 
-    // --- 2. LOAD CONFIG DARI ADMIN (LOGIKA SMART FINDER) ---
+    // Ambil string filter (misal: "grayscale(100%)")
+    const activeFilter = filterStyle?.filter || 'none';
+
+    // --- 2. LOAD CONFIG ---
     useEffect(() => {
         const loadConfig = () => {
             const savedGallery = localStorage.getItem('PHOTOBOOTH_GALLERY');
@@ -34,42 +33,21 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
             if (savedGallery) {
                 try {
                     const gallery = JSON.parse(savedGallery);
-                    
-                    // Cari template yang ID-nya benar-benar cocok (String vs String)
                     activeTemplate = gallery.find(t => String(t.id) === String(templateId));
-
-                    // Fallback: Jika tidak ketemu by ID, coba cari by Index
-                    if (!activeTemplate && gallery[templateId]) {
-                        activeTemplate = gallery[templateId];
-                    }
-                    
-                    // Fallback: Jika galeri ada isinya tapi ID tidak ketemu, ambil yang pertama
-                    if (!activeTemplate && gallery.length > 0) {
-                        activeTemplate = gallery[0];
-                    }
-                } catch(e) { 
-                    console.error("Config Load Error:", e); 
-                }
+                    if (!activeTemplate && gallery[templateId]) activeTemplate = gallery[templateId];
+                    if (!activeTemplate && gallery.length > 0) activeTemplate = gallery[0];
+                } catch(e) { console.error("Config Error:", e); }
             }
 
-            // Fallback terakhir jika galeri kosong
-            if (!activeTemplate) {
-                activeTemplate = {
-                    id: 'default',
-                    image: defaultTemplateImg,
-                    slots: [] 
-                };
-            }
-
+            if (!activeTemplate) activeTemplate = { id: 'default', image: defaultTemplateImg, slots: [] };
             setTemplateConfig(activeTemplate);
 
             if (!hasStartedProcess.current && validPhotos.length > 0) {
                 hasStartedProcess.current = true;
-                // Beri jeda sedikit agar state stabil
+                // Jeda sedikit agar UI render dulu
                 setTimeout(() => processAndUpload(activeTemplate), 500);
             }
         };
-
         const timer = setTimeout(loadConfig, 500);
         return () => clearTimeout(timer);
     }, [templateId, photos]);
@@ -78,38 +56,68 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
     const [gifIndex, setGifIndex] = useState(0);
     useEffect(() => {
         if (validPhotos.length === 0) return;
-        const interval = setInterval(() => {
-            setGifIndex(prev => (prev + 1) % validPhotos.length);
-        }, 500); 
+        const interval = setInterval(() => setGifIndex(prev => (prev + 1) % validPhotos.length), 500); 
         return () => clearInterval(interval);
     }, [validPhotos]);
 
-
     // ==========================================
-    // GENERATORS (DIOPTIMALKAN UNTUK SIZE KECIL)
+    // HELPER: TERAPKAN FILTER KE GAMBAR (Pre-processing)
     // ==========================================
-
-    const generateGifFile = (currentPhotos) => {
+    const applyFilterToImage = (src, filter) => {
         return new Promise((resolve) => {
-            const images = currentPhotos.map(p => p.src);
-            if (images.length === 0) return resolve(null);
-            // GIF Kecil (300px)
+            const img = new Image();
+            img.src = src;
+            img.crossOrigin = "Anonymous";
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                // Gunakan ukuran asli gambar
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                
+                // Terapkan Filter di sini (Permanen)
+                ctx.filter = filter;
+                ctx.drawImage(img, 0, 0);
+                
+                // Return JPEG kualitas tinggi 
+                resolve(canvas.toDataURL('image/jpeg', 0.9));
+            };
+            img.onerror = () => resolve(src); // Fallback ke asli jika gagal
+        });
+    };
+
+    // ==========================================
+    // GENERATORS
+    // ==========================================
+
+    // A. GIF (UPDATED: 16:9 & Pake Foto Terfilter)
+    const generateGifFile = (filteredImages) => {
+        return new Promise((resolve) => {
+            if (filteredImages.length === 0) return resolve(null);
+            
             gifshot.createGIF({
-                images: images, interval: 0.5, gifWidth: 300, gifHeight: 225, numFrames: 6
+                images: filteredImages, 
+                interval: 0.5, 
+                // UBAH KE 16:9 (480x270)
+                gifWidth: 1920, 
+                gifHeight: 1080, 
+                numFrames: 6
             }, (obj) => resolve(!obj.error ? obj.image : null));
         });
     };
 
-    const generateFrameFile = async (currentPhotos, cfg) => {
+    // B. FRAME (Output JPEG agar kecil)
+    const generateFrameFile = async (filteredImages, cfg) => {
         return new Promise(async (resolve) => {
             try {
                 const canvas = document.createElement('canvas');
-                // Base Admin Canvas = 320x480.
                 canvas.width = 320 * SCALE_FACTOR; 
                 canvas.height = 480 * SCALE_FACTOR;
                 const ctx = canvas.getContext('2d');
                 
-                // Background Putih
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -117,8 +125,8 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
                 bgImg.src = cfg ? cfg.image : defaultTemplateImg;
                 await new Promise(r => bgImg.onload = r);
 
-                const loadedPhotos = await Promise.all(currentPhotos.map(async (p) => {
-                    const img = new Image(); img.src = p.src;
+                const loadedPhotos = await Promise.all(filteredImages.map(async (src) => {
+                    const img = new Image(); img.src = src;
                     await new Promise(r => img.onload = r);
                     return img;
                 }));
@@ -127,34 +135,28 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
                 
                 loadedPhotos.forEach((img, i) => {
                     let x, y, w, h;
-
                     if (slots[i]) {
-                        // LOGIKA ADMIN (POSISI AKURAT)
-                        x = slots[i].x * SCALE_FACTOR;
-                        y = slots[i].y * SCALE_FACTOR;
-                        w = slots[i].width * SCALE_FACTOR;
-                        h = slots[i].height * SCALE_FACTOR;
+                        x = slots[i].x * SCALE_FACTOR; y = slots[i].y * SCALE_FACTOR;
+                        w = slots[i].width * SCALE_FACTOR; h = slots[i].height * SCALE_FACTOR;
                     } else {
-                        // FALLBACK GRID
-                        const col = i % 2; 
-                        const row = Math.floor(i / 2);
-                        w = 140 * SCALE_FACTOR;
-                        h = 100 * SCALE_FACTOR;
+                        const col = i % 2; const row = Math.floor(i / 2);
+                        w = 140 * SCALE_FACTOR; h = 100 * SCALE_FACTOR;
                         x = (20 * SCALE_FACTOR) + (col * (w + (10 * SCALE_FACTOR)));
                         y = (80 * SCALE_FACTOR) + (row * (h + (10 * SCALE_FACTOR)));
                     }
-
+                    
+                    // Gambar Foto (Sudah difilter di tahap pre-processing)
                     ctx.drawImage(img, x, y, w, h);
                 });
 
                 ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
-                
-                // PENTING: Gunakan JPEG 0.85 (Ukuran file turun 80% dibanding PNG)
+                // JPEG 0.85 (Sangat Ringan & Tajam)
                 resolve(canvas.toDataURL('image/jpeg', 0.85));
-            } catch (err) { console.error(err); resolve(null); }
+            } catch (err) { resolve(null); }
         });
     };
 
+    // C. VIDEO (Filter diterapkan Realtime)
     const generateLiveVideoFile = async (currentPhotos, cfg) => {
         return new Promise(async (resolve) => {
             try {
@@ -179,8 +181,6 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
                 }));
 
                 const stream = canvas.captureStream(VIDEO_FPS);
-                
-                // Kompresi Bitrate agar file kecil
                 const recorder = new MediaRecorder(stream, { 
                     mimeType: 'video/webm;codecs=vp8',
                     videoBitsPerSecond: VIDEO_BITRATE 
@@ -197,13 +197,10 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
                     videoElements.forEach((item) => {
                         if (!item) return;
                         const { v, index } = item;
-                        
                         let x, y, w, h;
                         if (slots[index]) {
-                            x = slots[index].x * SCALE_FACTOR;
-                            y = slots[index].y * SCALE_FACTOR;
-                            w = slots[index].width * SCALE_FACTOR;
-                            h = slots[index].height * SCALE_FACTOR;
+                            x = slots[index].x * SCALE_FACTOR; y = slots[index].y * SCALE_FACTOR;
+                            w = slots[index].width * SCALE_FACTOR; h = slots[index].height * SCALE_FACTOR;
                         } else {
                             const col = index % 2; const row = Math.floor(index / 2);
                             w = 140 * SCALE_FACTOR; h = 100 * SCALE_FACTOR;
@@ -211,27 +208,34 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
                             y = (80 * SCALE_FACTOR) + (row * (h + (10 * SCALE_FACTOR)));
                         }
 
+                        // --- APPLY FILTER KE VIDEO (Realtime) ---
+                        ctx.save();
+                        ctx.filter = activeFilter; 
                         ctx.drawImage(v, x, y, w, h);
+                        ctx.restore();
                     });
 
                     ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
                     animationId = requestAnimationFrame(draw);
                 };
 
-                recorder.start();
+                // FIX DURASI VIDEO: Start tanpa timeslice agar jadi satu blob utuh
+                recorder.start(); 
                 videoElements.forEach(item => item?.v.play());
                 draw();
 
+                // Rekam selama 5 Detik
                 setTimeout(() => {
                     cancelAnimationFrame(animationId);
-                    recorder.stop();
+                    if(recorder.state !== 'inactive') recorder.stop();
                     videoElements.forEach(item => { if(item) { item.v.pause(); item.v.src = ''; } });
-                }, 6000); 
+                }, 5000); 
 
                 recorder.onstop = () => {
                     const blob = new Blob(chunks, { type: 'video/webm' });
                     const reader = new FileReader();
                     reader.onloadend = () => {
+                        // Debugging Size
                         console.log("Video Size:", (reader.result.length/1024/1024).toFixed(2) + " MB");
                         resolve(reader.result);
                     };
@@ -244,19 +248,26 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
     // --- 4. ORKESTRATOR UPLOAD ---
     const processAndUpload = async (activeConfig) => {
         setIsUploading(true);
-        setLoadingText("Merender (Mode Ringan)...");
+        setLoadingText("Menerapkan Filter & Merender...");
 
         try {
+            // 1. Pre-process Semua Foto Raw dengan Filter (Agar RAW di Drive juga ada filternya)
+            const filteredPhotos = await Promise.all(
+                validPhotos.map(p => applyFilterToImage(p.src, activeFilter))
+            );
+
+            // 2. Generate Asset (Gunakan filteredPhotos untuk GIF dan Frame)
             const [liveVideo, gif, frame] = await Promise.all([
-                generateLiveVideoFile(photos, activeConfig),
-                generateGifFile(photos),
-                generateFrameFile(photos, activeConfig)
+                generateLiveVideoFile(photos, activeConfig), // Video butuh source video asli (blob)
+                generateGifFile(filteredPhotos), // GIF pakai foto terfilter
+                generateFrameFile(filteredPhotos, activeConfig) // Frame pakai foto terfilter
             ]);
 
             setLoadingText("Mengupload ke Google Drive...");
             
+            // 3. Upload (Kirim filteredPhotos sebagai 'photos' agar raw file di drive berfilter)
             const payload = {
-                photos: validPhotos.map(p => ({ src: p.src })),
+                photos: filteredPhotos.map(src => ({ src: src })), 
                 generated_gif: gif,
                 generated_frame: frame,
                 generated_live_video: liveVideo
@@ -282,74 +293,50 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
 
     // --- HELPER STYLE UNTUK PREVIEW HTML DI LAYAR ---
     const getSlotStyle = (index) => {
-        // Cek templateConfig agar aman
         if (!templateConfig || !templateConfig.slots[index]) {
-            const col = index % 2;
-            const row = Math.floor(index / 2);
+            const col = index % 2; const row = Math.floor(index / 2);
             return {
-                position: 'absolute',
-                width: '140px', height: '100px',
-                left: `${20 + (col * 150)}px`,
-                top: `${80 + (row * 110)}px`
+                position: 'absolute', width: '140px', height: '100px',
+                left: `${20 + (col * 150)}px`, top: `${80 + (row * 110)}px`
             };
         }
-
         const slot = templateConfig.slots[index];
         return {
             position: 'absolute',
-            left: `${slot.x}px`,
-            top: `${slot.y}px`,
-            width: `${slot.width}px`,
-            height: `${slot.height}px`,
+            left: `${slot.x}px`, top: `${slot.y}px`,
+            width: `${slot.width}px`, height: `${slot.height}px`,
         };
     };
 
-    const getBgImage = () => {
-        return templateConfig ? templateConfig.image : defaultTemplateImg;
-    }
+    const getBgImage = () => { return templateConfig ? templateConfig.image : defaultTemplateImg; }
 
     const handleBackToHome = () => {
         Swal.fire({
             title: 'Kembali ke Menu Utama?',
-            text: "Pastikan Anda sudah menyimpan/mendownload foto atau menscan QR Code. Sesi ini akan berakhir dan data foto akan dihapus.",
+            text: "Pastikan Anda sudah menyimpan/mendownload foto.",
             icon: 'question',
             showCancelButton: true,
-            confirmButtonColor: '#10b981', // Hijau
-            cancelButtonColor: '#6b7280',  // Abu-abu
-            confirmButtonText: 'Ya, Saya Sudah Simpan',
-            cancelButtonText: 'Belum, Kembali',
-            background: '#1f292d',
-            color: '#ffffff'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                onHome(); 
-            }
-        });
+            confirmButtonColor: '#10b981', cancelButtonColor: '#6b7280',
+            confirmButtonText: 'Ya, Sudah', cancelButtonText: 'Batal',
+            background: '#1f292d', color: '#ffffff'
+        }).then((result) => { if (result.isConfirmed) onHome(); });
     };
 
-    // --- RENDER UI ---
+    // --- RENDER UI (TETAP SAMA) ---
     return (
         <div className="min-h-screen w-full bg-gray-900 text-white flex flex-col items-center p-6 font-sans overflow-y-auto relative"
-             style={{
-                backgroundImage: 'url("/images/Navy Black and White Grunge Cat Desktop Wallpaper (2) (1).jpg")',
-                backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed'
-             }}
-        >
+             style={{ backgroundImage: 'url("/images/Navy Black and White Grunge Cat Desktop Wallpaper (2) (1).jpg")', backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' }}>
+            
             <div className="absolute inset-0 bg-black/40 pointer-events-none z-0"></div>
             
             <div className="w-full flex flex-col items-center z-10 relative">
-                {/* HEADER */}
                 <div className="w-full max-w-6xl flex justify-between items-center mb-8 border-b border-gray-500/50 pb-4">
                     <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-300 to-purple-300 drop-shadow-md">🎉 Hasil Photobooth Kamu</h1>
-                    <button
-                        onClick={handleBackToHome}
-                        className="bg-gray-800/80 hover:bg-gray-700/80 text-white px-6 py-2 rounded-full font-bold shadow-lg transition transform active:scale-95"
-                    >
+                    <button onClick={handleBackToHome} className="bg-gray-800/80 hover:bg-gray-700/80 text-white px-6 py-2 rounded-full font-bold shadow-lg transition transform active:scale-95">
                         Kembali ke halaman utama
                     </button>
                 </div>
 
-                {/* INFO BOX & QR CODE */}
                 <div className="w-full max-w-6xl bg-gray-900/60 backdrop-blur-md border border-white/20 rounded-2xl p-6 mb-12 flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl">
                     <div className="flex-1">
                         <h2 className="text-2xl font-bold mb-2 text-blue-200">✨ Download Softfile Lengkap</h2>
@@ -367,7 +354,6 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
                             </div>
                         )}
                     </div>
-                    
                     <div className="w-48 h-48 bg-white rounded-xl flex items-center justify-center shadow-lg p-2">
                         {isUploading ? (
                             <div className="flex flex-col items-center text-center px-2">
@@ -391,30 +377,24 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
                                 <span className="absolute top-0 left-0 bg-blue-600 px-3 py-1 text-xs font-bold rounded-tl-xl rounded-br-xl text-white z-20 shadow-md">1. Foto Frame</span>
                                 <div className="relative bg-white shadow-xl overflow-hidden" style={{ width: '240px', height: '360px' }}>
                                     <div className="absolute top-0 left-0 w-[320px] h-[480px] origin-top-left transform scale-[0.75]">
-                                        
-                                        {/* Render Foto sesuai Koordinat Admin */}
                                         {photos.map((p, i) => (
-                                            <div key={i} className="absolute overflow-hidden bg-gray-200" 
-                                                 style={getSlotStyle(i)}>
+                                            <div key={i} className="absolute overflow-hidden bg-gray-200" style={getSlotStyle(i)}>
                                                 {p && <img src={p.src} className="w-full h-full object-cover" style={filterStyle} alt="" />}
                                             </div>
                                         ))}
-
-                                        {/* Overlay Template */}
                                         <img src={getBgImage()} className="absolute inset-0 w-full h-full z-10 pointer-events-none" alt="Frame" />
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* 2. FOTO MENTAHAN */}
+                        {/* 2. MENTAHAN */}
                         <div className="flex flex-col items-center gap-4">
                             <div className="bg-gray-800/60 p-3 rounded-xl border border-gray-500/50 relative w-full h-[400px] flex items-center justify-center shadow-xl">
                                 <span className="absolute top-0 left-0 bg-gray-600 px-3 py-1 text-xs font-bold rounded-tl-xl rounded-br-xl text-white z-20 shadow-md">2. Foto Mentahan</span>
                                 <div className="relative w-[180px] h-[120px]">
                                     {validPhotos.slice(0, 3).map((p, i) => (
-                                        <img key={i} src={p.src} className="absolute w-full h-full object-cover border-4 border-white shadow-2xl rounded" 
-                                             style={{ top: i*20, left: i*15, transform: `rotate(${i*8-8}deg)`, zIndex: i, ...filterStyle }} alt="Raw" />
+                                        <img key={i} src={p.src} className="absolute w-full h-full object-cover border-4 border-white shadow-2xl rounded" style={{ top: i*20, left: i*15, transform: `rotate(${i*8-8}deg)`, zIndex: i, ...filterStyle }} alt="Raw" />
                                     ))}
                                 </div>
                             </div>
@@ -430,9 +410,7 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
                                             <div key={i} className="absolute overflow-hidden bg-gray-900" style={getSlotStyle(i)}>
                                                 {p?.video ? (
                                                     <video src={p.video} autoPlay loop muted playsInline className="w-full h-full object-cover transform scale-x-[-1]" style={filterStyle} />
-                                                ) : p ? (
-                                                    <img src={p.src} className="w-full h-full object-cover" style={filterStyle} alt="" />
-                                                ) : null}
+                                                ) : p ? <img src={p.src} className="w-full h-full object-cover" style={filterStyle} alt="" /> : null}
                                             </div>
                                         ))}
                                         <img src={getBgImage()} className="absolute inset-0 w-full h-full z-10 pointer-events-none" alt="" />

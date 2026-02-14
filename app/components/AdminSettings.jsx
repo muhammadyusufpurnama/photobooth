@@ -7,17 +7,17 @@ import Swal from 'sweetalert2';
 const AdminSettings = ({ onBack }) => {
     const [isMounted, setIsMounted] = useState(false);
 
-    // --- 1. STATE DEVICES (Tetap Sama) ---
+    // --- 1. STATE DEVICES ---
     const [cameras, setCameras] = useState([]);
     const [selectedCamera, setSelectedCamera] = useState('');
     const [printerName, setPrinterName] = useState('System Default');
 
-    // --- 2. STATE TEMPLATE & EDITOR (Tetap Sama) ---
+    // --- 2. STATE TEMPLATE & EDITOR ---
     const [templatePreview, setTemplatePreview] = useState('/images/templates/template1.png');
     const [photoSlots, setPhotoSlots] = useState([]);
     const [activeSlotId, setActiveSlotId] = useState(null);
 
-    // --- 3. STATE BARU: GALERI ---
+    // --- 3. STATE GALERI ---
     const [templateGallery, setTemplateGallery] = useState([]);
 
     // --- INIT: LOAD DATA ---
@@ -40,14 +40,14 @@ const AdminSettings = ({ onBack }) => {
         const savedPrinter = localStorage.getItem('PHOTOBOOTH_PRINTER');
         if (savedPrinter) setPrinterName(savedPrinter);
 
-        // Load Galeri dari LocalStorage
+        // Load Galeri
         const savedGallery = localStorage.getItem('PHOTOBOOTH_GALLERY');
         if (savedGallery) {
             try {
                 const parsed = JSON.parse(savedGallery);
                 setTemplateGallery(parsed);
-                // Tampilkan template terakhir di editor secara otomatis
                 if (parsed.length > 0) {
+                    // Load template terakhir agar admin tidak kosong saat dibuka
                     const last = parsed[parsed.length - 1];
                     setTemplatePreview(last.image);
                     setPhotoSlots(last.slots);
@@ -56,7 +56,7 @@ const AdminSettings = ({ onBack }) => {
         }
     }, []);
 
-    // --- LOGIC: DEVICE & EDITOR (Tetap Sama) ---
+    // --- LOGIC: DEVICE & EDITOR ---
     const handleCameraChange = (e) => setSelectedCamera(e.target.value);
     const handlePrinterChange = (e) => setPrinterName(e.target.value);
 
@@ -66,19 +66,24 @@ const AdminSettings = ({ onBack }) => {
             const reader = new FileReader();
             reader.onloadend = () => {
                 setTemplatePreview(reader.result);
-                setPhotoSlots([]); // Reset slot saat upload template baru
+                setPhotoSlots([]); // Reset slot jika ganti template
             };
             reader.readAsDataURL(file);
         }
     };
 
+    // --- PERBAIKAN DISINI: UBAH KE RASIO 16:9 ---
     const addPhotoSlot = () => {
         const newId = photoSlots.length + 1;
         setPhotoSlots([...photoSlots, {
             id: newId,
             x: 50, y: 50,
-            width: 150,   // Ukuran preview di admin
-            height: 100,  // Rasio 3:2 agar tidak penyet
+            // 160 x 90 adalah rasio murni 16:9
+            // 150 x 100 adalah rasio murni 3:2
+            // 120 x 120 adalah rasio murni 1:1
+            // Karena lockAspectRatio aktif, rasio ini akan terkunci selamanya saat resize
+            width: 160, 
+            height: 90, 
         }]);
     };
 
@@ -91,52 +96,48 @@ const AdminSettings = ({ onBack }) => {
     const deleteActiveSlot = () => {
         if (!activeSlotId) return;
         const filtered = photoSlots.filter(s => s.id !== activeSlotId);
+        // Re-index ID agar urut kembali (1, 2, 3...)
         const reindexed = filtered.map((s, index) => ({ ...s, id: index + 1 }));
         setPhotoSlots(reindexed);
         setActiveSlotId(null);
     };
 
-    // --- LOGIC BARU: SAVE KE GALERI ---
+    // --- LOGIC: SAVE KE GALERI ---
     const handleSave = () => {
-        // Validasi awal jika template belum dipilih
         if (!templatePreview) {
             return Swal.fire({
                 title: 'Template Kosong!',
                 text: 'Silakan pilih atau upload template terlebih dahulu.',
                 icon: 'error',
-                confirmButtonColor: '#3b82f6', // blue-600
+                confirmButtonColor: '#3b82f6',
             });
         }
 
-        // Tampilkan konfirmasi sebelum menyimpan
         Swal.fire({
             title: 'Simpan Konfigurasi?',
-            text: "Tata letak slot foto ini akan ditambahkan ke galeri (Maksimal 5).",
+            text: "Tata letak slot foto ini akan ditambahkan ke galeri.",
             icon: 'question',
             showCancelButton: true,
-            confirmButtonColor: '#10b981', // green-600
-            cancelButtonColor: '#6b7280',  // gray-500
+            confirmButtonColor: '#10b981',
+            cancelButtonColor: '#6b7280',
             confirmButtonText: 'Ya, Simpan!',
-            cancelButtonText: 'Batal',
             background: '#1f292d',
             color: '#ffffff'
         }).then((result) => {
             if (result.isConfirmed) {
-                // --- LOGIKA PENYIMPANAN ANDA ---
                 localStorage.setItem('PHOTOBOOTH_CAMERA_ID', selectedCamera);
                 localStorage.setItem('PHOTOBOOTH_PRINTER', printerName);
 
                 const savedGallery = JSON.parse(localStorage.getItem('PHOTOBOOTH_GALLERY') || '[]');
                 
                 const newEntry = {
-                    id: Date.now(),
+                    id: Date.now(), // ID Unik Timestamp
                     image: templatePreview,
                     slots: photoSlots
                 };
 
+                // Tambah ke galeri (Limit 5)
                 let updatedGallery = [...savedGallery, newEntry];
-                
-                // Logika limit 5 template
                 if (updatedGallery.length > 5) {
                     updatedGallery = updatedGallery.slice(1);
                 }
@@ -144,10 +145,9 @@ const AdminSettings = ({ onBack }) => {
                 localStorage.setItem('PHOTOBOOTH_GALLERY', JSON.stringify(updatedGallery));
                 setTemplateGallery(updatedGallery);
 
-                // Tampilkan pesan sukses
                 Swal.fire({
                     title: 'Berhasil!',
-                    text: 'Template baru telah ditambahkan ke galeri.',
+                    text: 'Template disimpan dengan rasio 16:9.',
                     icon: 'success',
                     timer: 2000,
                     showConfirmButton: false,
@@ -161,12 +161,12 @@ const AdminSettings = ({ onBack }) => {
     const deleteTemplate = (id) => {
         Swal.fire({
             title: 'Hapus Template?',
-            text: "Template ini akan dihapus permanen dari galeri.",
+            text: "Template ini akan dihapus permanen.",
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: '#ef4444', // red-600
+            confirmButtonColor: '#ef4444',
             cancelButtonColor: '#6b7280',
-            confirmButtonText: 'Ya, Hapus!',
+            confirmButtonText: 'Hapus',
             background: '#1f292d',
             color: '#ffffff'
         }).then((result) => {
@@ -201,7 +201,7 @@ const AdminSettings = ({ onBack }) => {
                 <button 
                     onClick={onBack} 
                     className="bg-gray-700 hover:bg-gray-600 px-6 py-2 rounded-full font-bold transition"
-                    suppressHydrationWarning={true} // <--- TAMBAHKAN INI
+                    suppressHydrationWarning={true}
                 >
                     Kembali
                 </button>
@@ -212,7 +212,6 @@ const AdminSettings = ({ onBack }) => {
                 {/* --- KOLOM KIRI: SETTINGS --- */}
                 <div className="lg:col-span-4 space-y-8 h-fit">
                     
-                    {/* SECTION 1 & 2 (UI LAMA ANDA) */}
                     <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700 shadow-lg space-y-6">
                         <h2 className="text-xl font-bold text-yellow-400">🔌 Koneksi Perangkat</h2>
                         <div className="space-y-4">
@@ -238,9 +237,11 @@ const AdminSettings = ({ onBack }) => {
                                 </div>
                                 <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
                             </label>
+                            
                             <button onClick={addPhotoSlot} className="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold transition transform active:scale-95">
-                                ➕ Tambah Slot Foto ({photoSlots.length})
+                                ➕ Tambah Slot Foto (16:9)
                             </button>
+                            
                             {activeSlotId && (
                                 <button onClick={deleteActiveSlot} className="w-full py-2 bg-red-600/20 text-red-400 border border-red-600 rounded-lg text-sm transition">
                                     Hapus Slot #{activeSlotId}
@@ -253,11 +254,10 @@ const AdminSettings = ({ onBack }) => {
                         💾 SIMPAN KE GALERI
                     </button>
 
-                    {/* --- UI BARU: DAFTAR GALERI (TERSERAH/DIBAWAH) --- */}
                     <div className="bg-gray-800 p-5 rounded-2xl border border-gray-700">
                         <h3 className="text-sm font-bold text-blue-300 uppercase mb-4 tracking-wider">🖼️ Galeri Template ({templateGallery.length}/5)</h3>
                         <div className="grid grid-cols-5 gap-2">
-                            {templateGallery.map((temp, index) => (
+                            {templateGallery.map((temp) => (
                                 <div key={temp.id} className="relative group aspect-[2/3] bg-black rounded border border-gray-600 overflow-hidden">
                                     <img 
                                         src={temp.image} 
@@ -281,14 +281,15 @@ const AdminSettings = ({ onBack }) => {
                     </div>
                 </div>
 
-                {/* --- KOLOM KANAN: WORKSPACE (UI LAMA ANDA) --- */}
+                {/* --- KOLOM KANAN: WORKSPACE --- */}
                 <div className="lg:col-span-8 flex flex-col items-center justify-start bg-black/50 rounded-3xl border-2 border-dashed border-gray-700 p-8 min-h-[600px] relative overflow-hidden">
                     <p className="absolute top-4 text-gray-500 text-xs uppercase tracking-widest font-bold z-20 pointer-events-none">
                         Canvas Preview (320px x 480px)
                     </p>
 
                     <div 
-                        className="relative bg-white shadow-2xl mt-8"
+                        // Overflow Hidden agar elemen "Over Border" terpotong rapi secara visual
+                        className="relative bg-white shadow-2xl mt-8 overflow-hidden"
                         style={{ 
                             width: '320px', 
                             height: '480px',
@@ -303,7 +304,9 @@ const AdminSettings = ({ onBack }) => {
                                 size={{ width: slot.width, height: slot.height }}
                                 position={{ x: slot.x, y: slot.y }}
                                 
-                                // --- FITUR KUNCI: MEMPERTAHANKAN RASIO ---
+                                // Hapus bounds agar bisa ditarik keluar garis (Bleeding)
+                                bounds={false} 
+                                // Kunci rasio agar tetap 16:9 saat dibesarkan/dikecilkan
                                 lockAspectRatio={true} 
                                 
                                 onDragStop={(e, d) => {
@@ -319,18 +322,15 @@ const AdminSettings = ({ onBack }) => {
                                     setActiveSlotId(slot.id);
                                 }}
                                 onMouseDown={() => setActiveSlotId(slot.id)}
-                                bounds="parent"
                                 className={`border-2 flex items-center justify-center cursor-move group
                                     ${activeSlotId === slot.id ? 'border-blue-500 z-50 bg-blue-500/20' : 'border-gray-800/50 bg-gray-800/30 hover:border-blue-300'}
                                 `}
-                                // Memastikan handle resize hanya muncul di sudut (bulatan)
                                 resizeHandleStyles={{
                                     topLeft: handleStyle,
                                     topRight: handleStyle,
                                     bottomLeft: handleStyle,
                                     bottomRight: handleStyle
                                 }}
-                                // Menonaktifkan resize dari sisi samping/atas/bawah agar hanya lewat sudut
                                 enableResizing={{
                                     top: false, right: false, bottom: false, left: false,
                                     topRight: true, bottomRight: true, bottomLeft: true, topLeft: true
