@@ -15,13 +15,15 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
 
     const validPhotos = photos.filter(p => p !== null);
 
-    // Default Asset (Jaga-jaga)
+    // Asset Default
     const defaultTemplateImg = '/images/templates/template1.png';
 
-    // --- SETTING KUALITAS (Aman untuk Upload) ---
-    const SCALE_FACTOR = 4.0; // Resolusi Output (480x720)
-    const VIDEO_FPS = 24; 
-    const VIDEO_BITRATE = 800000; 
+    // --- SETTING KUALITAS (DITURUNKAN AGAR TIDAK ERROR 413 DI VERCEL) ---
+    // Scale 1.5 = Resolusi output 480x720 (Cukup jelas di HP, File Ringan)
+    // Jangan pakai 4.0 (terlalu besar untuk Vercel Free Tier)
+    const SCALE_FACTOR = 1.5; 
+    const VIDEO_FPS = 15; // 15 FPS Cukup untuk Live Photo
+    const VIDEO_BITRATE = 600000; // 600 kbps (Sangat aman untuk upload)
 
     // --- 2. LOAD CONFIG DARI ADMIN (LOGIKA SMART FINDER) ---
     useEffect(() => {
@@ -33,10 +35,15 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
                 try {
                     const gallery = JSON.parse(savedGallery);
                     
-                    // Cari template yang ID-nya benar-benar cocok dengan templateId yang dikirim
+                    // Cari template yang ID-nya benar-benar cocok (String vs String)
                     activeTemplate = gallery.find(t => String(t.id) === String(templateId));
 
-                    // Jika karena suatu alasan tidak ketemu, ambil yang pertama di galeri sebagai fallback
+                    // Fallback: Jika tidak ketemu by ID, coba cari by Index
+                    if (!activeTemplate && gallery[templateId]) {
+                        activeTemplate = gallery[templateId];
+                    }
+                    
+                    // Fallback: Jika galeri ada isinya tapi ID tidak ketemu, ambil yang pertama
                     if (!activeTemplate && gallery.length > 0) {
                         activeTemplate = gallery[0];
                     }
@@ -58,7 +65,8 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
 
             if (!hasStartedProcess.current && validPhotos.length > 0) {
                 hasStartedProcess.current = true;
-                processAndUpload(activeTemplate); // Menggunakan template yang sudah fix ketemu
+                // Beri jeda sedikit agar state stabil
+                setTimeout(() => processAndUpload(activeTemplate), 500);
             }
         };
 
@@ -78,13 +86,14 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
 
 
     // ==========================================
-    // GENERATORS
+    // GENERATORS (DIOPTIMALKAN UNTUK SIZE KECIL)
     // ==========================================
 
     const generateGifFile = (currentPhotos) => {
         return new Promise((resolve) => {
             const images = currentPhotos.map(p => p.src);
             if (images.length === 0) return resolve(null);
+            // GIF Kecil (300px)
             gifshot.createGIF({
                 images: images, interval: 0.5, gifWidth: 300, gifHeight: 225, numFrames: 6
             }, (obj) => resolve(!obj.error ? obj.image : null));
@@ -95,13 +104,12 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
         return new Promise(async (resolve) => {
             try {
                 const canvas = document.createElement('canvas');
-                // Base Admin Canvas = 320x480. Kita kali Scale Factor.
+                // Base Admin Canvas = 320x480.
                 canvas.width = 320 * SCALE_FACTOR; 
                 canvas.height = 480 * SCALE_FACTOR;
                 const ctx = canvas.getContext('2d');
-                ctx.imageSmoothingEnabled = true;
-                ctx.imageSmoothingQuality = 'high';
-
+                
+                // Background Putih
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -115,20 +123,19 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
                     return img;
                 }));
 
-                // Gunakan Data Slot dari Admin
                 const slots = cfg ? cfg.slots : [];
                 
                 loadedPhotos.forEach((img, i) => {
                     let x, y, w, h;
 
                     if (slots[i]) {
-                        // --- LOGIKA ADMIN (POSISI AKURAT) ---
+                        // LOGIKA ADMIN (POSISI AKURAT)
                         x = slots[i].x * SCALE_FACTOR;
                         y = slots[i].y * SCALE_FACTOR;
                         w = slots[i].width * SCALE_FACTOR;
                         h = slots[i].height * SCALE_FACTOR;
                     } else {
-                        // --- FALLBACK GRID (Jika data slot admin error/kosong) ---
+                        // FALLBACK GRID
                         const col = i % 2; 
                         const row = Math.floor(i / 2);
                         w = 140 * SCALE_FACTOR;
@@ -141,7 +148,9 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
                 });
 
                 ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
-                resolve(canvas.toDataURL('image/png', 0.9));
+                
+                // PENTING: Gunakan JPEG 0.85 (Ukuran file turun 80% dibanding PNG)
+                resolve(canvas.toDataURL('image/jpeg', 0.85));
             } catch (err) { console.error(err); resolve(null); }
         });
     };
@@ -171,6 +180,7 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
 
                 const stream = canvas.captureStream(VIDEO_FPS);
                 
+                // Kompresi Bitrate agar file kecil
                 const recorder = new MediaRecorder(stream, { 
                     mimeType: 'video/webm;codecs=vp8',
                     videoBitsPerSecond: VIDEO_BITRATE 
@@ -221,7 +231,10 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
                 recorder.onstop = () => {
                     const blob = new Blob(chunks, { type: 'video/webm' });
                     const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result);
+                    reader.onloadend = () => {
+                        console.log("Video Size:", (reader.result.length/1024/1024).toFixed(2) + " MB");
+                        resolve(reader.result);
+                    };
                     reader.readAsDataURL(blob);
                 };
             } catch (e) { resolve(null); }
@@ -231,13 +244,13 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
     // --- 4. ORKESTRATOR UPLOAD ---
     const processAndUpload = async (activeConfig) => {
         setIsUploading(true);
-        setLoadingText("Merender Video & Frame...");
+        setLoadingText("Merender (Mode Ringan)...");
 
         try {
             const [liveVideo, gif, frame] = await Promise.all([
-                generateLiveVideoFile(validPhotos, activeConfig),
-                generateGifFile(validPhotos),
-                generateFrameFile(validPhotos, activeConfig)
+                generateLiveVideoFile(photos, activeConfig),
+                generateGifFile(photos),
+                generateFrameFile(photos, activeConfig)
             ]);
 
             setLoadingText("Mengupload ke Google Drive...");
@@ -257,7 +270,11 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
             }
         } catch (error) {
             console.error("Upload Error:", error);
-            setLoadingText("Gagal Upload.");
+            if (error.response && error.response.status === 413) {
+                setLoadingText("Gagal: File Terlalu Besar (413).");
+            } else {
+                setLoadingText("Gagal Upload.");
+            }
         } finally {
             setIsUploading(false);
         }
@@ -265,9 +282,8 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
 
     // --- HELPER STYLE UNTUK PREVIEW HTML DI LAYAR ---
     const getSlotStyle = (index) => {
-        // Cek apakah slot admin tersedia
+        // Cek templateConfig agar aman
         if (!templateConfig || !templateConfig.slots[index]) {
-            // Jika tidak, tampilkan grid standar (Agar tidak blank/rusak)
             const col = index % 2;
             const row = Math.floor(index / 2);
             return {
@@ -278,7 +294,6 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
             };
         }
 
-        // Jika ada, pakai koordinat Admin
         const slot = templateConfig.slots[index];
         return {
             position: 'absolute',
@@ -299,15 +314,14 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
             text: "Pastikan Anda sudah menyimpan/mendownload foto atau menscan QR Code. Sesi ini akan berakhir dan data foto akan dihapus.",
             icon: 'question',
             showCancelButton: true,
-            confirmButtonColor: '#10b981', // Hijau (Warna sukses)
+            confirmButtonColor: '#10b981', // Hijau
             cancelButtonColor: '#6b7280',  // Abu-abu
             confirmButtonText: 'Ya, Saya Sudah Simpan',
             cancelButtonText: 'Belum, Kembali',
-            background: '#1f292d', // Menyesuaikan tema gelap Anda
+            background: '#1f292d',
             color: '#ffffff'
         }).then((result) => {
             if (result.isConfirmed) {
-                // Memanggil fungsi reset dari page.js untuk kembali ke Home
                 onHome(); 
             }
         });
@@ -369,80 +383,80 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
                 </div>
 
                 {/* PREVIEW GRID */}
-                <div className="w-full max-w-7xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 pb-10">
-                    
-                    {/* 1. FOTO FRAME PREVIEW */}
-                    <div className="flex flex-col items-center gap-4">
-                        <div className="bg-gray-800/60 p-3 rounded-xl border border-gray-500/50 relative group w-full flex justify-center shadow-xl h-fit">
-                            <span className="absolute top-0 left-0 bg-blue-600 px-3 py-1 text-xs font-bold rounded-tl-xl rounded-br-xl text-white z-20 shadow-md">1. Foto Frame</span>
-                            
-                            {/* Container 240x360 (Visual di layar) */}
-                            <div className="relative bg-white shadow-xl overflow-hidden" style={{ width: '240px', height: '360px' }}>
-                                {/* Scale 320x480 ke 240x360 (0.75x) */}
-                                <div className="absolute top-0 left-0 w-[320px] h-[480px] origin-top-left transform scale-[0.75]">
-                                    
-                                    {/* Render Foto sesuai Koordinat Admin (atau Fallback) */}
-                                    {validPhotos.map((p, i) => (
-                                        <div key={i} className="overflow-hidden bg-gray-200" style={getSlotStyle(i)}>
-                                            {p && <img src={p.src} className="w-full h-full object-cover" style={filterStyle} alt="" />}
-                                        </div>
-                                    ))}
+                {templateConfig && (
+                    <div className="w-full max-w-7xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 pb-10">
+                        {/* 1. FOTO FRAME */}
+                        <div className="flex flex-col items-center gap-4">
+                            <div className="bg-gray-800/60 p-3 rounded-xl border border-gray-500/50 relative group w-full flex justify-center shadow-xl h-fit">
+                                <span className="absolute top-0 left-0 bg-blue-600 px-3 py-1 text-xs font-bold rounded-tl-xl rounded-br-xl text-white z-20 shadow-md">1. Foto Frame</span>
+                                <div className="relative bg-white shadow-xl overflow-hidden" style={{ width: '240px', height: '360px' }}>
+                                    <div className="absolute top-0 left-0 w-[320px] h-[480px] origin-top-left transform scale-[0.75]">
+                                        
+                                        {/* Render Foto sesuai Koordinat Admin */}
+                                        {photos.map((p, i) => (
+                                            <div key={i} className="absolute overflow-hidden bg-gray-200" 
+                                                 style={getSlotStyle(i)}>
+                                                {p && <img src={p.src} className="w-full h-full object-cover" style={filterStyle} alt="" />}
+                                            </div>
+                                        ))}
 
-                                    {/* Overlay Template */}
-                                    <img src={getBgImage()} className="absolute inset-0 w-full h-full z-10 pointer-events-none" alt="Frame" />
+                                        {/* Overlay Template */}
+                                        <img src={getBgImage()} className="absolute inset-0 w-full h-full z-10 pointer-events-none" alt="Frame" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 2. FOTO MENTAHAN */}
+                        <div className="flex flex-col items-center gap-4">
+                            <div className="bg-gray-800/60 p-3 rounded-xl border border-gray-500/50 relative w-full h-[400px] flex items-center justify-center shadow-xl">
+                                <span className="absolute top-0 left-0 bg-gray-600 px-3 py-1 text-xs font-bold rounded-tl-xl rounded-br-xl text-white z-20 shadow-md">2. Foto Mentahan</span>
+                                <div className="relative w-[180px] h-[120px]">
+                                    {validPhotos.slice(0, 3).map((p, i) => (
+                                        <img key={i} src={p.src} className="absolute w-full h-full object-cover border-4 border-white shadow-2xl rounded" 
+                                             style={{ top: i*20, left: i*15, transform: `rotate(${i*8-8}deg)`, zIndex: i, ...filterStyle }} alt="Raw" />
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 3. LIVE FRAME */}
+                        <div className="flex flex-col items-center gap-4">
+                            <div className="bg-gray-800/60 p-3 rounded-xl border border-gray-500/50 relative w-full flex justify-center shadow-xl h-fit">
+                                <span className="absolute top-0 left-0 bg-red-600 px-3 py-1 text-xs font-bold rounded-tl-xl rounded-br-xl text-white z-20 animate-pulse shadow-md">3. Live Frame</span>
+                                <div className="relative bg-black shadow-xl overflow-hidden" style={{ width: '240px', height: '360px' }}>
+                                    <div className="absolute top-0 left-0 w-[320px] h-[480px] origin-top-left transform scale-[0.75]">
+                                        {photos.map((p, i) => (
+                                            <div key={i} className="absolute overflow-hidden bg-gray-900" style={getSlotStyle(i)}>
+                                                {p?.video ? (
+                                                    <video src={p.video} autoPlay loop muted playsInline className="w-full h-full object-cover transform scale-x-[-1]" style={filterStyle} />
+                                                ) : p ? (
+                                                    <img src={p.src} className="w-full h-full object-cover" style={filterStyle} alt="" />
+                                                ) : null}
+                                            </div>
+                                        ))}
+                                        <img src={getBgImage()} className="absolute inset-0 w-full h-full z-10 pointer-events-none" alt="" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 4. GIF LOOP */}
+                        <div className="flex flex-col items-center gap-4">
+                            <div className="bg-gray-800/60 p-3 rounded-xl border border-gray-500/50 relative w-full flex items-center justify-center h-[400px] shadow-xl">
+                                <span className="absolute top-0 left-0 bg-purple-600 px-3 py-1 text-xs font-bold rounded-tl-xl rounded-br-xl text-white z-20 shadow-md">4. GIF Loop</span>
+                                <div className="relative w-[300px] aspect-[4/3] bg-black flex items-center justify-center overflow-hidden rounded-lg shadow-2xl border-4 border-white">
+                                    {validPhotos.length > 0 ? (
+                                        <img src={validPhotos[gifIndex].src} className="w-full h-full object-cover" style={filterStyle} alt="GIF Preview" />
+                                    ) : (
+                                        <div className="text-white text-xs">Memuat GIF...</div>
+                                    )}
+                                    <div className="absolute bottom-2 right-2 bg-black/70 text-[10px] px-2 py-0.5 rounded text-white font-mono backdrop-blur-sm">GIF</div>
                                 </div>
                             </div>
                         </div>
                     </div>
-
-                    {/* 2. MENTAHAN */}
-                    <div className="flex flex-col items-center gap-4">
-                        <div className="bg-gray-800/60 p-3 rounded-xl border border-gray-500/50 relative w-full h-[400px] flex items-center justify-center shadow-xl">
-                            <span className="absolute top-0 left-0 bg-gray-600 px-3 py-1 text-xs font-bold rounded-tl-xl rounded-br-xl text-white z-20 shadow-md">2. Foto Mentahan</span>
-                            <div className="relative w-[180px] h-[120px]">
-                                {validPhotos.slice(0, 3).map((p, i) => (
-                                    <img key={i} src={p.src} className="absolute w-full h-full object-cover border-4 border-white shadow-2xl rounded" 
-                                         style={{ top: i*20, left: i*15, transform: `rotate(${i*8-8}deg)`, zIndex: i, ...filterStyle }} alt="Raw" />
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* 3. LIVE FRAME PREVIEW */}
-                    <div className="flex flex-col items-center gap-4">
-                        <div className="bg-gray-800/60 p-3 rounded-xl border border-gray-500/50 relative w-full flex justify-center shadow-xl h-fit">
-                            <span className="absolute top-0 left-0 bg-red-600 px-3 py-1 text-xs font-bold rounded-tl-xl rounded-br-xl text-white z-20 animate-pulse shadow-md">3. Live Frame</span>
-                            <div className="relative bg-black shadow-xl overflow-hidden" style={{ width: '240px', height: '360px' }}>
-                                <div className="absolute top-0 left-0 w-[320px] h-[480px] origin-top-left transform scale-[0.75]">
-                                    {validPhotos.map((p, i) => (
-                                        <div key={i} className="overflow-hidden bg-gray-900" style={getSlotStyle(i)}>
-                                            {p?.video ? (
-                                                <video src={p.video} autoPlay loop muted playsInline className="w-full h-full object-cover transform scale-x-[-1]" style={filterStyle} />
-                                            ) : p ? <img src={p.src} className="w-full h-full object-cover" style={filterStyle} alt="" /> : null}
-                                        </div>
-                                    ))}
-                                    <img src={getBgImage()} className="absolute inset-0 w-full h-full z-10 pointer-events-none" alt="" />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* 4. GIF LOOP */}
-                    <div className="flex flex-col items-center gap-4">
-                        <div className="bg-gray-800/60 p-3 rounded-xl border border-gray-500/50 relative w-full flex items-center justify-center h-[400px] shadow-xl">
-                            <span className="absolute top-0 left-0 bg-purple-600 px-3 py-1 text-xs font-bold rounded-tl-xl rounded-br-xl text-white z-20 shadow-md">4. GIF Loop</span>
-                            <div className="relative w-[300px] aspect-[4/3] bg-black flex items-center justify-center overflow-hidden rounded-lg shadow-2xl border-4 border-white">
-                                {validPhotos.length > 0 ? (
-                                    <img src={validPhotos[gifIndex].src} className="w-full h-full object-cover" style={filterStyle} alt="GIF Preview" />
-                                ) : (
-                                    <div className="text-white text-xs">Memuat GIF...</div>
-                                )}
-                                <div className="absolute bottom-2 right-2 bg-black/70 text-[10px] px-2 py-0.5 rounded text-white font-mono backdrop-blur-sm">GIF</div>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
+                )}
             </div>
         </div>
     );
