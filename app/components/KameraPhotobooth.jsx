@@ -151,8 +151,8 @@ const KameraPhotobooth = ({ onBack, onFinish }) => {
         
         const constraints = {
             video: {
-                width: { ideal: 1280 }, 
-                height: { ideal: 720 }, 
+                width: { ideal: 960 }, 
+                height: { ideal: 640 }, 
                 deviceId: targetDeviceId ? { exact: targetDeviceId } : undefined, 
                 facingMode: targetDeviceId ? undefined : facingMode 
             },
@@ -198,8 +198,8 @@ const KameraPhotobooth = ({ onBack, onFinish }) => {
         // --- PRE-SCALE CAPTURE (Opsional, tapi bagus untuk performa) ---
         // Kita tangkap dengan resolusi setengah 1080p agar ringan saat preview & upload
         // 960x540 cukup tajam untuk slot kecil
-        const captureW = 1920;
-        const captureH = 1080;
+        const captureW = 960;
+        const captureH = 640;
 
         canvas.width = captureW;
         canvas.height = captureH;

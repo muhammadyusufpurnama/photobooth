@@ -17,7 +17,7 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId, bookingData })
     const defaultTemplateImg = '/images/templates/template1.png';
 
     // --- SETTING KUALITAS (Optimized) ---
-    const SCALE_FACTOR = 3.0; // Output 640x960 (Cukup tajam, File Ringan)
+    const SCALE_FACTOR = 2.0; // Output 640x960 (Cukup tajam, File Ringan)
     const VIDEO_FPS = 30; 
     const VIDEO_BITRATE = 800000; 
 

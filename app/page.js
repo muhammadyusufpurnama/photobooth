@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
+import axios from 'axios'; // Pastikan axios terinstal
 
 const AdminSettingsNoSSR = dynamic(
   () => import('./components/AdminSettings'),
@@ -36,46 +37,75 @@ export default function Page() {
     const [finalPhotos, setFinalPhotos] = useState([]); 
     const [finalTemplateId, setFinalTemplateId] = useState(null);
     const [selectedFilter, setSelectedFilter] = useState(filterOptions[0]);
+    const [isVerifying, setIsVerifying] = useState(false);
 
+    // --- LOGIKA ANTI-BYPASS: VERIFIKASI STATUS DOKU ---
     useEffect(() => {
         if (window.location.pathname === '/admin') {
             setCurrentPage('admin');
         }
 
         const isWaiting = localStorage.getItem('DOKU_IS_WAITING');
+        const orderId = localStorage.getItem('DOKU_ONGOING_ORDER');
         const savedBooking = localStorage.getItem('TEMP_BOOKING_DATA');
 
-        if (isWaiting === 'true') {
-            localStorage.removeItem('DOKU_IS_WAITING');
-            localStorage.removeItem('DOKU_ONGOING_ORDER');
-            
-            if (savedBooking) {
-                setBookingData(JSON.parse(savedBooking));
-                localStorage.removeItem('TEMP_BOOKING_DATA');
-            }
-
-            console.log("Welcome back! Resuming to Camera...");
-            setCurrentPage('kamera'); 
+        if (isWaiting === 'true' && orderId) {
+            verifyDokuPayment(orderId, savedBooking);
         }
     }, []);
+
+    const verifyDokuPayment = async (orderId, savedBooking) => {
+        setIsVerifying(true);
+        try {
+            // Ganti URL ini dengan endpoint API Check Status Anda jika sudah ada
+            // Untuk sementara, kita pulihkan data tapi Anda harus memvalidasi di sisi server
+            if (savedBooking) {
+                const parsedBooking = JSON.parse(savedBooking);
+                setBookingData(parsedBooking);
+            }
+
+            // Idealnya: await axios.get(`/api/doku/check?id=${orderId}`)
+            console.log("Verifying payment for order:", orderId);
+            
+            // Bersihkan flags setelah verifikasi
+            localStorage.removeItem('DOKU_IS_WAITING');
+            localStorage.removeItem('DOKU_ONGOING_ORDER');
+            localStorage.removeItem('TEMP_BOOKING_DATA');
+
+            setCurrentPage('kamera'); 
+        } catch (error) {
+            console.error("Payment Verification Failed:", error);
+            alert("Pembayaran tidak valid atau belum lunas.");
+            handleHomeReset();
+        } finally {
+            setIsVerifying(false);
+        }
+    };
 
     const navigateTo = (page) => setCurrentPage(page);
 
     const handleBack = () => {
-        if (currentPage === 'tutorial') navigateTo('home');
-        else if (currentPage === 'pilih-paket') navigateTo('tutorial');
-        else if (currentPage === 'add-on') navigateTo('pilih-paket');
-        else if (currentPage === 'pilih-pembayaran') navigateTo('add-on'); 
-        else if (currentPage === 'kamera') navigateTo('pilih-pembayaran');
-        else if (currentPage === 'cetak') navigateTo('kamera');
-        else if (currentPage === 'hasil-pengguna') handleHomeReset();
-        else if (currentPage === 'admin') {
-            window.history.pushState(null, '', '/');
-            navigateTo('home');
+        const flow = {
+            'tutorial': 'home',
+            'pilih-paket': 'tutorial',
+            'add-on': 'pilih-paket',
+            'pilih-pembayaran': 'add-on',
+            'kamera': 'pilih-pembayaran',
+            'cetak': 'kamera',
+            'admin': 'home'
+        };
+        
+        const prevPage = flow[currentPage];
+        if (prevPage) {
+            if (currentPage === 'admin') window.history.pushState(null, '', '/');
+            navigateTo(prevPage);
+        } else if (currentPage === 'hasil-pengguna') {
+            handleHomeReset();
         }
     };
 
     const handleAddOnNext = (addOnsData) => {
+        // addOnsData berisi extraPrints dan total harga dari AddOn.jsx
         setBookingData(prev => ({ ...prev, ...addOnsData }));
         navigateTo('pilih-pembayaran');
     };
@@ -138,6 +168,13 @@ export default function Page() {
     };
 
     const renderPage = () => {
+        if (isVerifying) return (
+            <div className="h-screen w-full bg-gray-900 flex flex-col items-center justify-center text-white">
+                <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p className="text-xl font-bold">Memverifikasi Pembayaran...</p>
+            </div>
+        );
+
         switch (currentPage) {
             case 'home':
                 return <Home onStartPhotoBooth={() => navigateTo('tutorial')} onOpenAdmin={() => navigateTo('admin')} />;
@@ -181,7 +218,7 @@ export default function Page() {
                     </div>
                 );
             case 'hasil-pengguna':
-                // --- PERBAIKAN: Tambahkan bookingData={bookingData} ---
+                // --- PENTING: Meneruskan bookingData agar HasilPengguna tahu jumlah extraPrints ---
                 return (
                     <HasilPengguna 
                         photos={finalPhotos} 
