@@ -310,7 +310,7 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId, bookingData })
                 
                 // Cek apakah saklar "Cetak Otomatis" di AdminSettings menyala
                 if (adminConfig.autoPrint) {
-                    const standarPaket = 2; // Paket standar 25k mendapatkan 2 strip
+                    const standarPaket = 1; // Paket standar 25k mendapatkan 2 strip
                     const tambahanAddOn = bookingData?.extraPrints || 0; // Diambil dari AddOn.jsx
                     const totalCetak = standarPaket + tambahanAddOn;
 
