@@ -37,30 +37,25 @@ export default function Page() {
     const [finalTemplateId, setFinalTemplateId] = useState(null);
     const [selectedFilter, setSelectedFilter] = useState(filterOptions[0]);
 
-    // --- LOGIKA BARU: DETEKSI KEMBALI DARI DOKU ---
     useEffect(() => {
-        // Cek admin route
         if (window.location.pathname === '/admin') {
             setCurrentPage('admin');
         }
 
-        // Cek status pembayaran dari localStorage
         const isWaiting = localStorage.getItem('DOKU_IS_WAITING');
         const savedBooking = localStorage.getItem('TEMP_BOOKING_DATA');
 
         if (isWaiting === 'true') {
-            // Hapus flag agar tidak terjadi looping navigasi
             localStorage.removeItem('DOKU_IS_WAITING');
             localStorage.removeItem('DOKU_ONGOING_ORDER');
             
-            // Pulihkan data booking jika ada yang disimpan
             if (savedBooking) {
                 setBookingData(JSON.parse(savedBooking));
                 localStorage.removeItem('TEMP_BOOKING_DATA');
             }
 
             console.log("Welcome back! Resuming to Camera...");
-            setCurrentPage('kamera'); // Paksa navigasi ke sesi foto
+            setCurrentPage('kamera'); 
         }
     }, []);
 
@@ -85,9 +80,7 @@ export default function Page() {
         navigateTo('pilih-pembayaran');
     };
 
-    // Modifikasi handleNext dari Pembayaran
     const handlePilihPembayaranNext = (status) => {
-        // Jika statusnya 'DEV_BYPASS' atau 'LUNAS_DOKU'
         setBookingData(prev => ({ ...prev, paymentStatus: status }));
         navigateTo('kamera');
     };
@@ -103,7 +96,7 @@ export default function Page() {
         setBookingData({});
         setFinalPhotos([]);
         setFinalTemplateId(null);
-        localStorage.clear(); // Bersihkan sisa-sisa tracking pembayaran
+        localStorage.clear(); 
         navigateTo('home');
     };
 
@@ -155,7 +148,6 @@ export default function Page() {
             case 'add-on':
                 return <AddOn onNext={handleAddOnNext} onBack={handleBack} selectedPackage={bookingData.package} />;
             case 'pilih-pembayaran':
-                // Sekarang menggunakan komponen DOKU
                 return <PilihPembayaran onNext={handlePilihPembayaranNext} onBack={handleBack} bookingData={bookingData} />;
             case 'kamera':
                 return <KameraPhotobooth onBack={handleBack} onFinish={handleCameraFinish} />;
@@ -189,7 +181,16 @@ export default function Page() {
                     </div>
                 );
             case 'hasil-pengguna':
-                return <HasilPengguna photos={finalPhotos} templateId={finalTemplateId} filterStyle={selectedFilter.style} onHome={handleHomeReset} />;
+                // --- PERBAIKAN: Tambahkan bookingData={bookingData} ---
+                return (
+                    <HasilPengguna 
+                        photos={finalPhotos} 
+                        templateId={finalTemplateId} 
+                        filterStyle={selectedFilter.style} 
+                        onHome={handleHomeReset} 
+                        bookingData={bookingData} 
+                    />
+                );
             case 'admin':
                 return <AdminSettingsNoSSR onBack={handleBack} />;
             default:

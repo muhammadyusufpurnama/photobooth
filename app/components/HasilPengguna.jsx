@@ -5,7 +5,7 @@ import axios from 'axios';
 import gifshot from 'gifshot';
 import Swal from 'sweetalert2';
 
-const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
+const HasilPengguna = ({ onHome, photos, filterStyle, templateId, bookingData }) => {
     // --- 1. STATE CONFIG & UI ---
     const [templateConfig, setTemplateConfig] = useState(null); 
     const [downloadLink, setDownloadLink] = useState(null);
@@ -254,28 +254,81 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
         });
     };
 
+    const printFrame = (dataUrl) => {
+    const printWindow = window.open('', '_blank');
+    
+    // Validasi agar tidak error jika pop-up diblokir
+    if (!printWindow) {
+        alert("Pop-up diblokir! Harap izinkan pop-up pada browser Anda untuk mencetak otomatis.");
+        return;
+    }
+
+    printWindow.document.write(`
+            <html>
+                <head>
+                    <title>Cetak Photobooth</title>
+                    <style>
+                        @page { size: 10cm 15cm; margin: 0; }
+                        body { margin: 0; display: flex; justify-content: center; align-items: center; }
+                        img { width: 100%; height: auto; }
+                    </style>
+                </head>
+                <body onload="window.print(); window.close();">
+                    <img src="${dataUrl}" />
+                </body>
+            </html>
+        `);
+        printWindow.document.close();
+    };
+
     // --- 4. ORKESTRATOR UPLOAD ---
+    // --- 4. ORKESTRATOR UPLOAD & PRINT OTOMATIS ---
     const processAndUpload = async (activeConfig) => {
         setIsUploading(true);
         setLoadingText("Menerapkan Filter & Merender...");
 
         try {
-            // 1. Pre-process Semua Foto Raw dengan Filter (Agar RAW di Drive juga ada filternya)
+            // 1. Pre-process Semua Foto Raw dengan Filter agar file di Drive sudah estetik
             const filteredPhotos = await Promise.all(
                 validPhotos.map(p => applyFilterToImage(p.src, activeFilter))
             );
 
-            // 2. Generate Asset (Gunakan filteredPhotos untuk GIF dan Frame)
+            // 2. Generate Semua Asset (Live Video, GIF, dan Frame Cetak) secara paralel
             const [liveVideo, gif, frame] = await Promise.all([
-                generateLiveVideoFile(photos, activeConfig), // Video butuh source video asli (blob)
-                generateGifFile(filteredPhotos), // GIF pakai foto terfilter
-                generateFrameFile(filteredPhotos, activeConfig) // Frame pakai foto terfilter
+                generateLiveVideoFile(photos, activeConfig), // Video tetap pakai blob asli agar tidak lag
+                generateGifFile(filteredPhotos),
+                generateFrameFile(filteredPhotos, activeConfig)
             ]);
+
+            // =============================================================
+            // LOGIKA AUTO-PRINT: STANDAR 2 STRIP + EXTRA DARI ADD-ON
+            // =============================================================
+            const savedAdminSettings = localStorage.getItem('ADMIN_SETTINGS');
+            
+            if (savedAdminSettings && frame) {
+                const adminConfig = JSON.parse(savedAdminSettings);
+                
+                // Cek apakah saklar "Cetak Otomatis" di AdminSettings menyala
+                if (adminConfig.autoPrint) {
+                    const standarPaket = 2; // Paket standar 25k mendapatkan 2 strip
+                    const tambahanAddOn = bookingData?.extraPrints || 0; // Diambil dari AddOn.jsx
+                    const totalCetak = standarPaket + tambahanAddOn;
+
+                    setLoadingText(`Mengirim ${totalCetak} Strip ke Printer...`);
+                    
+                    // Melakukan perintah cetak sebanyak total kalkulasi
+                    for (let i = 0; i < totalCetak; i++) {
+                        printFrame(frame);
+                    }
+                }
+            }
+            // =============================================================
 
             setLoadingText("Mengupload ke Google Drive...");
             
-            // 3. Upload (Kirim filteredPhotos sebagai 'photos' agar raw file di drive berfilter)
+            // 3. Susun Payload untuk dikirim ke API Upload Drive
             const payload = {
+                // Raw photos dikirim yang sudah ter-filter
                 photos: filteredPhotos.map(src => ({ src: src })), 
                 generated_gif: gif,
                 generated_frame: frame,
@@ -289,11 +342,11 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId }) => {
                 setLoadingText("Selesai!");
             }
         } catch (error) {
-            console.error("Upload Error:", error);
+            console.error("Proses Gagal:", error);
             if (error.response && error.response.status === 413) {
-                setLoadingText("Gagal: File Terlalu Besar (413).");
+                setLoadingText("Gagal: Ukuran File Terlalu Besar.");
             } else {
-                setLoadingText("Gagal Upload.");
+                setLoadingText("Gagal memproses asset.");
             }
         } finally {
             setIsUploading(false);
