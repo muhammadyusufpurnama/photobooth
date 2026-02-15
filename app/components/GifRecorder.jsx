@@ -12,8 +12,8 @@ const GifRecorder = ({ onGifReady }) => {
         // --- 1. TENTUKAN RESOLUSI TARGET (16:9 VERCEL SAFE) ---
         // PENTING: Jangan pakai 1920x1080 untuk GIF! Ukurannya akan 15MB++ (Gagal Upload).
         // Gunakan 480x270 (Rasio 16:9 murni). Cukup tajam untuk GIF HP & Size kecil (~300KB).
-        const targetWidth = 1920; 
-        const targetHeight = 1080; 
+        const targetWidth = 960; 
+        const targetHeight = 640; 
 
         // 2. Inisialisasi GIF
         const gif = new GIF({
