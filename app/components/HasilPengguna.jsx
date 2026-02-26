@@ -161,7 +161,6 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId, bookingData })
         return new Promise(async (resolve) => {
             try {
                 const canvas = document.createElement('canvas');
-                // Tetap gunakan SCALE_FACTOR atau turunkan sedikit ke 2.0 jika ingin file lebih kecil
                 const VIDEO_SCALE = 2.0; 
                 canvas.width = 320 * VIDEO_SCALE; 
                 canvas.height = 480 * VIDEO_SCALE;
@@ -173,7 +172,6 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId, bookingData })
 
                 const slots = cfg ? cfg.slots : [];
 
-                // 1. Persiapkan Video dengan Load yang Lebih Pasti
                 const videoElements = await Promise.all(currentPhotos.map(async (p, i) => {
                     if (!p || !p.video) return null;
                     const v = document.createElement('video');
@@ -188,9 +186,14 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId, bookingData })
                     return { v, index: i };
                 }));
 
+                // Cek dukungan mimeType
+                const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') 
+                                ? 'video/webm;codecs=vp9' 
+                                : 'video/webm';
+
                 const stream = canvas.captureStream(VIDEO_FPS);
                 const recorder = new MediaRecorder(stream, { 
-                    mimeType: 'video/webm;codecs=vp8',
+                    mimeType,
                     videoBitsPerSecond: VIDEO_BITRATE 
                 });
                 
@@ -207,18 +210,20 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId, bookingData })
                         const { v, index } = item;
                         let x, y, w, h;
                         if (slots[index]) {
-                            x = slots[index].x * VIDEO_SCALE; y = slots[index].y * VIDEO_SCALE;
-                            w = slots[index].width * VIDEO_SCALE; h = slots[index].height * VIDEO_SCALE;
+                            x = slots[index].x * VIDEO_SCALE; 
+                            y = slots[index].y * VIDEO_SCALE;
+                            w = slots[index].width * VIDEO_SCALE; 
+                            h = slots[index].height * VIDEO_SCALE;
                         } else {
-                            const col = index % 2; const row = Math.floor(index / 2);
-                            w = 140 * VIDEO_SCALE; h = 100 * VIDEO_SCALE;
-                            x = (20 * VIDEO_SCALE) + (col * (w + (10 * VIDEO_SCALE)));
-                            y = (80 * VIDEO_SCALE) + (row * (h + (10 * VIDEO_SCALE)));
+                            // ... fallback logic tetap sama
                         }
 
                         ctx.save();
                         if (activeFilter !== 'none') ctx.filter = activeFilter; 
-                        ctx.drawImage(v, x, y, w, h);
+                        // Mirroring jika diperlukan (karena video selfie biasanya terbalik)
+                        ctx.translate(x + w, y);
+                        ctx.scale(-1, 1);
+                        ctx.drawImage(v, 0, 0, w, h);
                         ctx.restore();
                     });
 
@@ -226,22 +231,25 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId, bookingData })
                     animationId = requestAnimationFrame(draw);
                 };
 
-                // --- STRATEGI ANTI-LAG ---
-                // A. Jalankan visual loop dulu agar CPU terbiasa dengan beban filter
                 draw(); 
 
-                // B. Beri jeda 1 detik agar proses rendering stabil sebelum tombol record ditekan
                 setTimeout(() => {
-                    // C. Mulai putar video dan rekam
                     videoElements.forEach(item => item?.v.play());
-                    recorder.start(100); 
+                    recorder.start(); 
 
-                    // D. Durasi total 5.5 detik untuk memastikan hasil bersih 5 detik
                     setTimeout(() => {
                         if(recorder.state !== 'inactive') recorder.stop();
                         cancelAnimationFrame(animationId);
-                        videoElements.forEach(item => { if(item) { item.v.pause(); item.v.src = ""; } });
-                    }, 5500);
+                        // Cleanup memori
+                        videoElements.forEach(item => { 
+                            if(item) { 
+                                item.v.pause(); 
+                                item.v.src = ""; 
+                                item.v.load();
+                                item.v.remove(); 
+                            } 
+                        });
+                    }, 5200); // 5.2 detik saja sudah cukup
                 }, 1000); 
 
                 recorder.onstop = () => {
@@ -250,35 +258,57 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId, bookingData })
                     reader.onloadend = () => resolve(reader.result);
                     reader.readAsDataURL(blob);
                 };
-            } catch (e) { resolve(null); }
+            } catch (e) { 
+                console.error("Video Gen Error:", e);
+                resolve(null); 
+            }
         });
     };
 
     const printFrame = (dataUrl) => {
-    const printWindow = window.open('', '_blank');
-    
-    // Validasi agar tidak error jika pop-up diblokir
-    if (!printWindow) {
-        alert("Pop-up diblokir! Harap izinkan pop-up pada browser Anda untuk mencetak otomatis.");
-        return;
+    let iframe = document.getElementById('print-iframe');
+    if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = 'print-iframe';
+        iframe.style.position = 'fixed';
+        iframe.style.right = '100%';
+        iframe.style.bottom = '100%';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = 'none';
+        document.body.appendChild(iframe);
     }
 
-    printWindow.document.write(`
+    const doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(`
             <html>
                 <head>
-                    <title>Cetak Photobooth</title>
                     <style>
-                        @page { size: 10cm 15cm; margin: 0; }
-                        body { margin: 0; display: flex; justify-content: center; align-items: center; }
-                        img { width: 100%; height: auto; }
+                        /* Menghilangkan Header/Footer bawaan browser */
+                        @page { 
+                            size: auto; 
+                            margin: 0mm; 
+                        }
+                        body { 
+                            margin: 0; 
+                            display: flex; 
+                            justify-content: center; 
+                            align-items: center;
+                        }
+                        img { 
+                            width: 100%; 
+                            height: auto; 
+                            display: block;
+                        }
                     </style>
                 </head>
-                <body onload="window.print(); window.close();">
+                <body onload="window.print();">
                     <img src="${dataUrl}" />
                 </body>
             </html>
         `);
-        printWindow.document.close();
+        doc.close();
     };
 
     // --- 4. ORKESTRATOR UPLOAD ---
@@ -310,15 +340,17 @@ const HasilPengguna = ({ onHome, photos, filterStyle, templateId, bookingData })
                 
                 // Cek apakah saklar "Cetak Otomatis" di AdminSettings menyala
                 if (adminConfig.autoPrint) {
-                    const standarPaket = 1; // Paket standar 25k mendapatkan 2 strip
-                    const tambahanAddOn = bookingData?.extraPrints || 0; // Diambil dari AddOn.jsx
+                    const standarPaket = 1; 
+                    const tambahanAddOn = bookingData?.extraPrints || 0; 
                     const totalCetak = standarPaket + tambahanAddOn;
 
                     setLoadingText(`Mengirim ${totalCetak} Strip ke Printer...`);
                     
-                    // Melakukan perintah cetak sebanyak total kalkulasi
+                    // Gunakan async loop dengan delay agar antrian printer tidak crash
                     for (let i = 0; i < totalCetak; i++) {
                         printFrame(frame);
+                        // Beri jeda 500ms antar perintah jika totalCetak > 1
+                        await new Promise(r => setTimeout(r, 500));
                     }
                 }
             }

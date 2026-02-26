@@ -35,7 +35,7 @@ export async function POST(request) {
                 amount: Number(amount), // Pastikan bertipe Number
                 invoice_number: invoiceNumber,
                 currency: "IDR",
-                callback_url: "https://photobooth-chi-seven.vercel.app/", // Ganti ke domain asli saat deploy
+                callback_url: "http://localhost:3000", // Ganti ke domain asli saat deploy
                 auto_redirect: true
             },
             payment: {
